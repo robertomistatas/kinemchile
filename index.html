@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kinem Digital - Gestión de Pacientes</title>
+    <meta name="description" content="Sistema de gestión de fichas kinesiológicas para la consulta Kinem">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            600: "#2563eb" // blue-600
+                        },
+                        accent: {
+                            500: "#14b8a6" // teal-500
+                        }
+                    },
+                    spacing: {
+                        "unit": "1rem"
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+    <div id="app" x-data="appData()" x-cloak>
+        <!-- Header -->
+        <header class="bg-blue-600 text-white shadow-md">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <img src="https://static.wixstatic.com/media/1831cb_7f3e8c943c604e4fa3004279321aab09%7Emv2.png/v1/fill/w_180%2Ch_180%2Clg_1%2Cusm_0.66_1.00_0.01/1831cb_7f3e8c943c604e4fa3004279321aab09%7Emv2.png" alt="Logo Kinem" class="h-8 w-auto mr-3" />
+                    <span class="font-bold text-xl">Kinem Digital</span>
+                </div>
+                <nav class="flex space-x-4">
+                    <template x-for="(navItem, index) in navigation" :key="index">
+                        <a 
+                            :href="navItem.path" 
+                            @click.prevent="currentView = navItem.view"
+                            :class="{
+                                'bg-blue-600 text-white': currentView === navItem.view,
+                                'text-gray-600 hover:bg-gray-100 hover:text-gray-900': currentView !== navItem.view
+                            }"
+                            class="text-sm font-medium rounded-md px-3 py-2"
+                        >
+                            <span x-text="navItem.label"></span>
+                        </a>
+                    </template>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <!-- Loading Indicator -->
+            <div x-show="isLoading" class="fixed inset-0 bg-gray-500 bg-opacity-50 flex items-center justify-center z-50">
+                <div class="bg-white p-6 rounded-lg shadow-lg flex items-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Cargando...</span>
+                </div>
+            </div>
+
+            <!-- Dashboard View -->
+            <div x-show="currentView === 'dashboard'" class="space-y-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Panel Principal</h2>
+                
+                <!-- Search Input -->
+                <div class="w-full max-w-lg mx-auto mb-6">
+                    <form @submit.prevent="searchPatients(searchTerm)" class="relative">
+                        <label for="search-paciente" class="mb-2 text-sm font-medium text-gray-900 sr-only">Buscar Paciente</label>
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <input
+                            type="search"
+                            id="search-paciente"
+                            x-model="searchTerm"
+                            class="block w-full p-4 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Buscar por Nombre o RUT..."
+                        />
+                        <button type="submit" class="text-white absolute right-2.5 bottom-2.5 bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2">
+                            Buscar
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Today's Appointments -->
+                <div class="bg-white p-4 sm:p-6 rounded-lg shadow mb-6">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">Atenciones del Día (<span x-text="todayDate"></span>)</h3>
+                    <template x-if="todayAppointments.length === 0">
+                        <p class="text-gray-500">No hay atenciones programadas para hoy.</p>
+                    </template>
+                    <template x-if="todayAppointments.length > 0">
+                        <ul class="divide-y divide-gray-200">
+                            <template x-for="appointment in todayAppointments" :key="appointment.id">
+                                <li class="py-3 flex justify-between items-center flex-wrap">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="font-mono text-sm text-gray-700 bg-gray-100 px-2 py-1 rounded" x-text="appointment.hora"></span>
+                                        <span class="font-medium text-gray-800" x-text="appointment.pacienteNombre"></span>
+                                    </div>
+                                    <span 
+                                        class="text-xs font-medium mr-2 px-2.5 py-0.5 rounded mt-2 sm:mt-0"
+                                        :class="{
+                                            'bg-green-100 text-green-800': appointment.estado === 'Confirmada',
+                                            'bg-yellow-100 text-yellow-800': appointment.estado === 'Pendiente',
+                                            'bg-red-100 text-red-800': appointment.estado === 'Cancelada',
+                                            'bg-blue-100 text-blue-800': appointment.estado === 'Agendado'
+                                        }"
+                                        x-text="appointment.estado"
+                                    ></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </template>
+                </div>
+
+                <!-- Recent Patients -->
+                <div class="bg-white p-4 sm:p-6 rounded-lg shadow">
+                    <h3 class="text-xl font-semibold mb-4 text-blue-600">Pacientes Recientes</h3>
+                    <template x-if="recentPatients.length === 0">
+                        <p class="text-gray-500">No hay pacientes registrados recientemente.</p>
+                    </template>
+                    <template x-if="recentPatients.length > 0">
+                        <ul class="divide-y divide-gray-200">
+                            <template x-for="patient in recentPatients" :key="patient.id">
+                                <li class="py-3 flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium text-gray-900" x-text="patient.nombre"></p>
+                                        <p class="text-sm text-gray-500">
+                                            RUT: <span x-text="formatRut(patient.rut)"></span> | ODA: <span x-text="patient.oda || 'N/A'"></span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        @click="editPatient(patient)"
+                                        class="text-sm bg-teal-500 text-white px-3 py-1 rounded-md hover:bg-teal-600"
+                                    >
+                                        Ver Ficha
+                                    </button>
+                                </li>
+                            </template>
+                        </ul>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Patient Search View -->
+            <div x-show="currentView === 'search'" class="space-y-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Buscar Pacientes</h2>
+                
+                <!-- Search Input -->
+                <div class="w-full max-w-lg mx-auto mb-6">
+                    <form @submit.prevent="searchPatients(searchTerm)" class="relative">
+                        <label for="search-paciente" class="mb-2 text-sm font-medium text-gray-900 sr-only">Buscar Paciente</label>
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <input
+                            type="search"
+                            id="search-paciente"
+                            x-model="searchTerm"
+                            class="block w-full p-4 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Buscar por Nombre o RUT..."
+                        />
+                        <button type="submit" class="text-white absolute right-2.5 bottom-2.5 bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2">
+                            Buscar
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Search Results -->
+                <template x-if="searchTerm && searchResults.length > 0">
+                    <div class="mt-6 bg-white p-4 sm:p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-medium text-gray-700 mb-4">Resultados para "<span x-text="searchTerm"></span>"</h3>
+                        <ul class="divide-y divide-gray-200">
+                            <template x-for="patient in searchResults" :key="patient.id">
+                                <li class="py-3 flex justify-between items-center">
+                                    <div>
+                                        <p class="font-medium text-gray-900" x-text="patient.nombre"></p>
+                                        <p class="text-sm text-gray-500">
+                                            RUT: <span x-text="formatRut(patient.rut)"></span> | ODA: <span x-text="patient.oda || 'N/A'"></span>
+                                        </p>
+                                    </div>
+                                    <button
+                                        @click="editPatient(patient)"
+                                        class="text-sm bg-teal-500 text-white px-3 py-1 rounded-md hover:bg-teal-600"
+                                    >
+                                        Ver Ficha
+                                    </button>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+                </template>
+
+                <template x-if="searchTerm && searchResults.length === 0">
+                    <div class="mt-6 bg-white p-4 sm:p-6 rounded-lg shadow">
+                        <h3 class="text-lg font-medium text-gray-700 mb-4">Resultados para "<span x-text="searchTerm"></span>"</h3>
+                        <p class="text-gray-500">No se encontraron pacientes.</p>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Patient Form View -->
+            <div x-show="currentView === 'form'" class="space-y-6">
+                <div class="bg-white rounded-lg shadow-xl overflow-hidden max-w-4xl mx-auto mt-6 mb-6">
+                    <form @submit.prevent="savePatient" class="p-4 sm:p-6 space-y-6">
+                        <h2 class="text-2xl font-semibold mb-6 text-center text-blue-600">
+                            <template x-if="currentPatient.id">
+                                Ficha Paciente: <span x-text="currentPatient.nombre || ''"></span>
+                            </template>
+                            <template x-if="!currentPatient.id">
+                                Ingresar Nueva Ficha Kinésica
+                            </template>
+                        </h2>
+
+                        <!-- Personal Data Section -->
+                        <section class="border border-gray-200 rounded-md p-4">
+                            <h3 class="text-xl font-semibold mb-4 text-blue-600">Datos del Paciente</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="mb-4">
+                                    <label for="nombre" class="block text-sm font-medium text-gray-700 mb-1">
+                                        Nombre Completo<span class="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="nombre"
+                                        x-model="currentPatient.nombre"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                        required
+                                    />
+                                </div>
+                                <div class="mb-4">
+                                    <label for="rut" class="block text-sm font-medium text-gray-700 mb-1">
+                                        RUT<span class="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="rut"
+                                        x-model="rutDisplay"
+                                        @input="handleRutInput($event)"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                        required
+                                    />
+                                    <template x-if="rutError">
+                                        <p class="mt-1 text-xs text-red-600" x-text="rutError"></p>
+                                    </template>
+                                </div>
+                                <div class="mb-4">
+                                    <label for="oda" class="block text-sm font-medium text-gray-700 mb-1">ODA</label>
+                                    <input
+                                        type="text"
+                                        id="oda"
+                                        x-model="currentPatient.oda"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                    />
+                                </div>
+                                <div class="md:col-span-2 mb-4">
+                                    <label for="direccion" class="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
+                                    <input
+                                        type="text"
+                                        id="direccion"
+                                        x-model="currentPatient.direccion"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                    />
+                                </div>
+                                <div class="mb-4">
+                                    <label for="telefono" class="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                                    <input
+                                        type="tel"
+                                        id="telefono"
+                                        x-model="currentPatient.telefono"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                    />
+                                </div>
+                                <div class="mb-4">
+                                    <label for="edad" class="block text-sm font-medium text-gray-700 mb-1">Edad</label>
+                                    <input
+                                        type="number"
+                                        id="edad"
+                                        x-model="currentPatient.edad"
+                                        class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Clinical Data Section -->
+                        <section class="border border-gray-200 rounded-md p-4">
+                            <h3 class="text-xl font-semibold mb-4 text-blue-600">Información Clínica</h3>
+                            <div class="mb-4">
+                                <label for="diagnostico" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Diagnóstico Médico<span class="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    id="diagnostico"
+                                    x-model="currentPatient.diagnostico"
+                                    rows="3"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                    required
+                                ></textarea>
+                            </div>
+                            <div class="mb-4">
+                                <label for="antecedentes" class="block text-sm font-medium text-gray-700 mb-1">Antecedentes Clínicos Relevantes</label>
+                                <textarea
+                                    id="antecedentes"
+                                    x-model="currentPatient.antecedentes"
+                                    rows="4"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                ></textarea>
+                            </div>
+                            <div class="mb-4">
+                                <label for="examenes" class="block text-sm font-medium text-gray-700 mb-1">Exámenes Auxiliares</label>
+                                <textarea
+                                    id="examenes"
+                                    x-model="currentPatient.examenes"
+                                    rows="4"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                ></textarea>
+                            </div>
+                        </section>
+
+                        <!-- Evaluations Section -->
+                        <section class="border border-gray-200 rounded-md p-4">
+                            <h3 class="text-xl font-semibold mb-4 text-blue-600">Evaluaciones Kinésicas</h3>
+                            <div class="mb-4">
+                                <label for="evaluacionInicial" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Evaluación Inicial<span class="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    id="evaluacionInicial"
+                                    x-model="currentPatient.evaluacionInicial"
+                                    rows="5"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                    required
+                                ></textarea>
+                            </div>
+                            <div class="mb-4">
+                                <label for="evaluacionFinal" class="block text-sm font-medium text-gray-700 mb-1">Evaluación Final (al alta)</label>
+                                <textarea
+                                    id="evaluacionFinal"
+                                    x-model="currentPatient.evaluacionFinal"
+                                    rows="5"
+                                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white"
+                                ></textarea>
+                            </div>
+                        </section>
+
+                        <!-- Sessions Section -->
+                        <section class="border border-gray-200 rounded-md p-4">
+                            <h3 class="text-xl font-semibold mb-4 text-blue-600">Registro de Prestaciones / Sesiones</h3>
+                            <div class="space-y-3">
+                                <template x-for="(session, index) in currentPatient.prestaciones" :key="index">
+                                    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 border border-gray-100 rounded bg-gray-50">
+                                        <div class="flex-grow w-full sm:w-auto">
+                                            <label :for="'fecha-' + index" class="block text-xs font-medium text-gray-600 mb-1">Fecha <span x-text="index + 1"></span></label>
+                                            <input
+                                                type="date"
+                                                :id="'fecha-' + index"
+                                                x-model="session.fecha"
+                                                class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                            />
+                                        </div>
+                                        <div class="flex-grow w-full">
+                                            <label :for="'detalle-' + index" class="block text-xs font-medium text-gray-600 mb-1">Prestaciones / Observaciones <span x-text="index + 1"></span></label>
+                                            <textarea
+                                                :id="'detalle-' + index"
+                                                x-model="session.detalle"
+                                                rows="2"
+                                                class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                                placeholder="Ej: Ejercicios isométricos, Masoterapia, Ultrasonido..."
+                                            ></textarea>
+                                        </div>
+                                        <template x-if="currentPatient.prestaciones.length > 1">
+                                            <button
+                                                type="button"
+                                                @click="removeSession(index)"
+                                                class="mt-2 sm:mt-0 sm:ml-2 px-3 py-2 bg-red-500 text-white text-xs font-medium rounded-md shadow-sm hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 self-start sm:self-center"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            <button
+                                type="button"
+                                @click="addSession"
+                                class="mt-4 px-4 py-2 bg-teal-500 text-white text-sm font-medium rounded-md shadow-sm hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+                            >
+                                Añadir Sesión
+                            </button>
+                        </section>
+
+                        <!-- Save Button -->
+                        <div class="flex justify-end pt-6">
+                            <button
+                                type="submit"
+                                class="px-6 py-2 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                <template x-if="currentPatient.id">Actualizar Ficha</template>
+                                <template x-if="!currentPatient.id">Guardar Ficha</template>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Firebase and Alpine.js -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDd2DbPqo7HsOvDsrTszgLCuU8zJUZdQ6Y",
+            authDomain: "kinem-b904e.firebaseapp.com",
+            projectId: "kinem-b904e",
+            storageBucket: "kinem-b904e.appspot.com",
+            messagingSenderId: "30584936443",
+            appId: "1:30584936443:web:db51131bbe7a97f5999d5e"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function appData() {
+            return {
+                currentView: 'dashboard',
+                searchTerm: '',
+                rutDisplay: '',
+                rutError: '',
+                isLoading: false,
+                navigation: [
+                    { path: '/', view: 'dashboard', label: 'Dashboard' },
+                    { path: '/buscar', view: 'search', label: 'Buscar Paciente' },
+                    { path: '/nuevo', view: 'form', label: 'Nueva Ficha' }
+                ],
+                patients: [],
+                todayAppointments: [],
+                recentPatients: [],
+                searchResults: [],
+                currentPatient: {
+                    id: null,
+                    nombre: '',
+                    rut: '',
+                    oda: '',
+                    direccion: '',
+                    telefono: '',
+                    edad: '',
+                    diagnostico: '',
+                    antecedentes: '',
+                    examenes: '',
+                    evaluacionInicial: '',
+                    evaluacionFinal: '',
+                    prestaciones: [{ fecha: '', detalle: '' }],
+                    createdAt: null,
+                    updatedAt: null
+                },
+                todayDate: new Date().toLocaleDateString('es-CL', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                }),
+                init() {
+                    this.loadPatients();
+                    this.loadAppointments();
+                },
+                async loadPatients() {
+                    this.isLoading = true;
+                    try {
+                        const snapshot = await db.collection('patients')
+                            .orderBy('createdAt', 'desc')
+                            .limit(5)
+                            .get();
+                        
+                        this.patients = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        }));
+                        
+                        // Get recent patients (last 5)
+                        this.recentPatients = [...this.patients].slice(0, 5);
+                    } catch (error) {
+                        console.error("Error loading patients:", error);
+                        alert("Error al cargar los pacientes");
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                async loadAppointments() {
+                    try {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        const snapshot = await db.collection('appointments')
+                            .where('date', '==', firebase.firestore.Timestamp.fromDate(today))
+                            .orderBy('time')
+                            .get();
+                        
+                        this.todayAppointments = snapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data(),
+                            pacienteNombre: this.getPatientName(doc.data().patientId)
+                        }));
+                    } catch (error) {
+                        console.error("Error loading appointments:", error);
+                    }
+                },
+                getPatientName(patientId) {
+                    const patient = this.patients.find(p => p.id === patientId);
+                    return patient ? patient.nombre : 'Paciente no encontrado';
+                },
+                searchPatients(term) {
+                    if (!term) {
+                        this.searchResults = [];
+                        return;
+                    }
+                    
+                    const lowerTerm = term.toLowerCase();
+                    this.searchResults = this.patients.filter(p =>
+                        p.nombre.toLowerCase().includes(lowerTerm) ||
+                        p.rut.toLowerCase().includes(lowerTerm.replace(/[.-]/g, ''))
+                    );
+                    
+                    if (this.currentView !== 'search') {
+                        this.currentView = 'search';
+                    }
+                },
+                formatRut(rut) {
+                    if (!rut) return '';
+                    
+                    rut = rut.toString().toUpperCase();
+                    let cuerpo = rut.slice(0, -1);
+                    let dv = rut.slice(-1);
+                    
+                    cuerpo = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    return cuerpo + '-' + dv;
+                },
+                validateRut(rut) {
+                    if (!rut) return { valid: false, formatted: '', error: '' };
+                    
+                    rut = rut.replace(/\./g, '').replace(/-/g, '').toUpperCase();
+                    let cuerpo = rut.slice(0, -1);
+                    let dv = rut.slice(-1);
+                    
+                    if (!/^\d+$/.test(cuerpo) || !/^[\dkK]$/.test(dv)) {
+                        const formattedPartial = rut.length > 1
+                            ? cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + dv
+                            : rut;
+                        return { valid: false, formatted: formattedPartial, error: '' };
+                    }
+                    
+                    let suma = 0;
+                    let multiplo = 2;
+                    for (let i = cuerpo.length - 1; i >= 0; i--) {
+                        suma += parseInt(cuerpo.charAt(i), 10) * multiplo;
+                        multiplo = multiplo === 7 ? 2 : multiplo + 1;
+                    }
+                    
+                    const dvEsperado = 11 - (suma % 11);
+                    const dvCalculado = dvEsperado === 11 ? '0' : dvEsperado === 10 ? 'K' : dvEsperado.toString();
+                    const isValid = dv === dvCalculado;
+                    
+                    let rutFormateado = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+                    rutFormateado += '-' + dv;
+                    
+                    return {
+                        valid: isValid,
+                        formatted: rutFormateado,
+                        error: isValid || rut === '' ? '' : 'RUT inválido'
+                    };
+                },
+                handleRutInput(event) {
+                    const value = event.target.value;
+                    this.rutDisplay = value;
+                    
+                    const { valid, formatted, error } = this.validateRut(value);
+                    const cleanRut = value.replace(/[.-]/g, '').toUpperCase();
+                    
+                    this.currentPatient.rut = cleanRut;
+                    this.rutError = error;
+                    
+                    // Auto-format on blur
+                    if (event.type === 'blur' && formatted) {
+                        this.rutDisplay = formatted;
+                    }
+                },
+                addSession() {
+                    this.currentPatient.prestaciones.push({ fecha: '', detalle: '' });
+                },
+                removeSession(index) {
+                    if (this.currentPatient.prestaciones.length > 1) {
+                        this.currentPatient.prestaciones.splice(index, 1);
+                    }
+                },
+                async editPatient(patient) {
+                    this.isLoading = true;
+                    try {
+                        const doc = await db.collection('patients').doc(patient.id).get();
+                        if (doc.exists) {
+                            this.currentPatient = {
+                                id: doc.id,
+                                ...doc.data(),
+                                prestaciones: doc.data().prestaciones || [{ fecha: '', detalle: '' }]
+                            };
+                            this.rutDisplay = this.formatRut(doc.data().rut);
+                            this.currentView = 'form';
+                        } else {
+                            alert('Paciente no encontrado');
+                        }
+                    } catch (error) {
+                        console.error("Error loading patient:", error);
+                        alert("Error al cargar el paciente");
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+                newPatient() {
+                    this.currentPatient = {
+                        id: null,
+                        nombre: '',
+                        rut: '',
+                        oda: '',
+                        direccion: '',
+                        telefono: '',
+                        edad: '',
+                        diagnostico: '',
+                        antecedentes: '',
+                        examenes: '',
+                        evaluacionInicial: '',
+                        evaluacionFinal: '',
+                        prestaciones: [{ fecha: '', detalle: '' }],
+                        createdAt: null,
+                        updatedAt: null
+                    };
+                    this.rutDisplay = '';
+                    this.rutError = '';
+                    this.currentView = 'form';
+                },
+                async savePatient() {
+                    const { valid, error } = this.validateRut(this.currentPatient.rut);
+                    this.rutError = error;
+                    
+                    if (!valid && this.currentPatient.rut) {
+                        console.error("Error: El RUT ingresado no es válido.");
+                        document.getElementById('rut')?.focus();
+                        return;
+                    }
+                    
+                    // Validate required fields
+                    if (!this.currentPatient.nombre || !this.currentPatient.diagnostico || !this.currentPatient.evaluacionInicial) {
+                        alert('Por favor complete todos los campos requeridos');
+                        return;
+                    }
+                    
+                    this.isLoading = true;
+                    
+                    try {
+                        const now = firebase.firestore.Timestamp.fromDate(new Date());
+                        const patientData = {
+                            ...this.currentPatient,
+                            updatedAt: now,
+                            prestaciones: this.currentPatient.prestaciones.filter(s => s.fecha && s.detalle)
+                        };
+                        
+                        delete patientData.id;
+                        
+                        if (this.currentPatient.id) {
+                            // Update existing patient
+                            await db.collection('patients').doc(this.currentPatient.id).update(patientData);
+                            alert('Ficha actualizada correctamente');
+                        } else {
+                            // Add new patient
+                            patientData.createdAt = now;
+                            const docRef = await db.collection('patients').add(patientData);
+                            this.currentPatient.id = docRef.id;
+                            alert('Nueva ficha guardada correctamente');
+                        }
+                        
+                        // Refresh data
+                        await this.loadPatients();
+                        this.currentView = 'dashboard';
+                    } catch (error) {
+                        console.error("Error saving patient:", error);
+                        alert("Error al guardar la ficha");
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
