@@ -26,7 +26,7 @@ export default function NuevoPacientePage() {
     nombre: "",
     apellido: "",
     rut: "",
-    Folio: "",
+    folio: "",
     direccion: "",
     telefono: "",
     edad: "",
