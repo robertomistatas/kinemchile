@@ -26,7 +26,7 @@ export default function NuevoPacientePage() {
     nombre: "",
     apellido: "",
     rut: "",
-    oda: "",
+    Folio: "",
     direccion: "",
     telefono: "",
     edad: "",
@@ -207,11 +207,11 @@ export default function NuevoPacientePage() {
                       <div className="space-y-2">
                         <Label htmlFor="oda">ODA</Label>
                         <Input
-                          id="oda"
-                          name="oda"
-                          value={formData.oda}
+                          id="folio"
+                          name="folio"
+                          value={formData.folio}
                           onChange={handleChange}
-                          placeholder="Orden de Atención"
+                          placeholder="Folio del paciente"
                         />
                       </div>
                       <div className="space-y-2">
