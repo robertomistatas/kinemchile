@@ -205,7 +205,7 @@ export default function NuevoPacientePage() {
                         {rutError && <p className="text-sm text-red-500">{rutError}</p>}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="oda">ODA</Label>
+                        <Label htmlFor="folio">Folio</Label>
                         <Input
                           id="folio"
                           name="folio"
