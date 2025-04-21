@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -39,10 +39,35 @@ const validarFechaNacimiento = (fecha: string) => {
 }
 
 export default function NuevoPacientePage() {
+  // Añadimos un estado para controlar si estamos en el cliente
+  const [isClient, setIsClient] = useState(false)
+  
+  // Usamos useEffect para establecer isClient a true cuando el componente se monta en el cliente
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+  
+  // Si no estamos en el cliente, renderizamos un estado de carga o nada
+  if (!isClient) {
+    return (
+      <Layout>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        </div>
+      </Layout>
+    )
+  }
+  
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [rutError, setRutError] = useState("")
+  const [formErrors, setFormErrors] = useState({
+    telefono: "",
+    email: "",
+    edad: "",
+    fechaNacimiento: ""
+  })
   const [formData, setFormData] = useState({
     // Datos del Paciente
     nombre: "",
