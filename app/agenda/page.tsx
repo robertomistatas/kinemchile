@@ -73,6 +73,7 @@ const citasMock = [
 export default function AgendaPage() {
   const { toast } = useToast()
   const [citas, setCitas] = useState<Cita[]>([])
+  const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -223,7 +224,7 @@ export default function AgendaPage() {
                         <SelectValue placeholder="Seleccionar paciente" />
                       </SelectTrigger>
                       <SelectContent>
-                        {pacientesMock.map((paciente) => (
+                        {pacientes.map((paciente) => (
                           <SelectItem key={paciente.id} value={paciente.id}>
                             {paciente.nombre} {paciente.apellido}
                           </SelectItem>
