@@ -176,6 +176,57 @@ export default function AgendaPage() {
     setNuevaCita((prev) => ({ ...prev, [name]: value }))
   }
 
+  // Remove the second handleSubmit function and keep only this one
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      // Obtener el nombre del paciente seleccionado
+      const paciente = pacientesMock.find(p => p.id === nuevaCita.pacienteId)
+      if (!paciente) {
+        throw new Error("Paciente no encontrado")
+      }
+
+      const citaData = {
+        ...nuevaCita,
+        pacienteNombre: `${paciente.nombre} ${paciente.apellido}`
+      }
+
+      await createCita(citaData)
+      
+      // Recargar citas
+      const citasActualizadas = await getCitas()
+      setCitas(citasActualizadas)
+
+      toast({
+        title: "Éxito",
+        description: "Cita agendada correctamente",
+      })
+
+      // Cerrar el diálogo y limpiar el formulario
+      setIsDialogOpen(false)
+      setNuevaCita({
+        pacienteId: "",
+        pacienteNombre: "",
+        fecha: new Date().toISOString().split("T")[0],
+        hora: "09:00",
+        duracion: "45",
+        tipo: "Evaluación",
+        estado: "pendiente",
+      })
+    } catch (error) {
+      console.error("Error al crear cita:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo agendar la cita",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // En una aplicación real, aquí enviaríamos los datos a la API
