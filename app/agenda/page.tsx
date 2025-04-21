@@ -74,6 +74,8 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isNewPatient, setIsNewPatient] = useState(false)
+  const [searchRut, setSearchRut] = useState("")
   const [nuevaCita, setNuevaCita] = useState({
     pacienteId: "",
     pacienteNombre: "",
@@ -84,69 +86,77 @@ export default function AgendaPage() {
     estado: "pendiente",
   })
 
-  // Cargar citas y pacientes
   useEffect(() => {
-    const cargarDatos = async () => {
-      try {
-        const [citasData, pacientesData] = await Promise.all([
-          getCitas(),
-          getPacientes()
-        ])
-        setCitas(citasData)
-        setPacientes(pacientesData)
-      } catch (error) {
-        console.error("Error al cargar datos:", error)
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
     cargarDatos()
-  }, [toast])
+  }, [])
+
+  const cargarDatos = async () => {
+    try {
+      const [citasData, pacientesData] = await Promise.all([getCitas(), getPacientes()])
+      setCitas(citasData)
+      setPacientes(pacientesData)
+    } catch (error) {
+      console.error("Error al cargar datos:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los datos",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const buscarPacientePorRut = async () => {
+    try {
+      const paciente = await getPacienteByRut(searchRut)
+      if (paciente) {
+        setNuevaCita(prev => ({
+          ...prev,
+          pacienteId: paciente.id,
+          pacienteNombre: `${paciente.nombre} ${paciente.apellido}`
+        }))
+        setIsNewPatient(false)
+      } else {
+        setIsNewPatient(true)
+        toast({
+          title: "Paciente no encontrado",
+          description: "Deberá crear una nueva ficha para este paciente",
+        })
+      }
+    } catch (error) {
+      console.error("Error al buscar paciente:", error)
+      toast({
+        title: "Error",
+        description: "Error al buscar el paciente",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    if (isNewPatient) {
+      router.push("/pacientes/nuevo")
+      return
+    }
 
     try {
-      // Obtener el nombre del paciente seleccionado
       const paciente = pacientes.find(p => p.id === nuevaCita.pacienteId)
-      if (!paciente) {
-        throw new Error("Paciente no encontrado")
-      }
+      if (!paciente) throw new Error("Paciente no encontrado")
 
-      const citaData = {
+      await createCita({
         ...nuevaCita,
         pacienteNombre: `${paciente.nombre} ${paciente.apellido}`
-      }
-
-      await createCita(citaData)
+      })
       
-      // Recargar citas
-      const citasActualizadas = await getCitas()
-      setCitas(citasActualizadas)
-
+      await cargarDatos()
       toast({
         title: "Éxito",
         description: "Cita agendada correctamente",
       })
-
-      // Cerrar el diálogo y limpiar el formulario
       setIsDialogOpen(false)
-      setNuevaCita({
-        pacienteId: "",
-        pacienteNombre: "",
-        fecha: new Date().toISOString().split("T")[0],
-        hora: "09:00",
-        duracion: "45",
-        tipo: "Evaluación",
-        estado: "pendiente",
-      })
+      resetForm()
     } catch (error) {
       console.error("Error al crear cita:", error)
       toast({
@@ -154,93 +164,24 @@ export default function AgendaPage() {
         description: "No se pudo agendar la cita",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
   }
 
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedDate(e.target.value)
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setNuevaCita((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSelectChange = (name: string, value: string) => {
-    setNuevaCita((prev) => ({ ...prev, [name]: value }))
-  }
-
-  // Remove the second handleSubmit function and keep only this one
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      // Obtener el nombre del paciente seleccionado
-      const paciente = pacientesMock.find(p => p.id === nuevaCita.pacienteId)
-      if (!paciente) {
-        throw new Error("Paciente no encontrado")
-      }
-
-      const citaData = {
-        ...nuevaCita,
-        pacienteNombre: `${paciente.nombre} ${paciente.apellido}`
-      }
-
-      await createCita(citaData)
-      
-      // Recargar citas
-      const citasActualizadas = await getCitas()
-      setCitas(citasActualizadas)
-
-      toast({
-        title: "Éxito",
-        description: "Cita agendada correctamente",
-      })
-
-      // Cerrar el diálogo y limpiar el formulario
-      setIsDialogOpen(false)
-      setNuevaCita({
-        pacienteId: "",
-        pacienteNombre: "",
-        fecha: new Date().toISOString().split("T")[0],
-        hora: "09:00",
-        duracion: "45",
-        tipo: "Evaluación",
-        estado: "pendiente",
-      })
-    } catch (error) {
-      console.error("Error al crear cita:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo agendar la cita",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // En una aplicación real, aquí enviaríamos los datos a la API
-    console.log("Nueva cita:", nuevaCita)
-
-    // Cerrar el diálogo
-    setIsDialogOpen(false)
-
-    // Limpiar el formulario
+  const resetForm = () => {
     setNuevaCita({
       pacienteId: "",
+      pacienteNombre: "",
       fecha: new Date().toISOString().split("T")[0],
       hora: "09:00",
       duracion: "45",
       tipo: "Evaluación",
       estado: "pendiente",
     })
+    setSearchRut("")
+    setIsNewPatient(false)
   }
+
+  const citasDelDia = citas.filter(cita => cita.fecha === selectedDate)
 
   return (
     <Layout>
@@ -257,86 +198,99 @@ export default function AgendaPage() {
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle>Agendar Nueva Cita</DialogTitle>
-                <DialogDescription>Complete los datos para agendar una nueva cita</DialogDescription>
+                <DialogDescription>Busque el paciente por RUT o cree uno nuevo</DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit}>
                 <div className="grid gap-4 py-4">
                   <div className="grid gap-2">
-                    <Label htmlFor="pacienteId">Paciente</Label>
-                    <Select
-                      value={nuevaCita.pacienteId}
-                      onValueChange={(value) => handleSelectChange("pacienteId", value)}
-                    >
-                      <SelectTrigger id="pacienteId">
-                        <SelectValue placeholder="Seleccionar paciente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {pacientes.map((paciente) => (
-                          <SelectItem key={paciente.id} value={paciente.id}>
-                            {paciente.nombre} {paciente.apellido}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="fecha">Fecha</Label>
+                    <Label htmlFor="searchRut">RUT del Paciente</Label>
+                    <div className="flex gap-2">
                       <Input
-                        id="fecha"
-                        name="fecha"
-                        type="date"
-                        value={nuevaCita.fecha}
-                        onChange={handleChange}
-                        required
+                        id="searchRut"
+                        value={searchRut}
+                        onChange={(e) => setSearchRut(e.target.value)}
+                        placeholder="12.345.678-9"
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="hora">Hora</Label>
-                      <Input
-                        id="hora"
-                        name="hora"
-                        type="time"
-                        value={nuevaCita.hora}
-                        onChange={handleChange}
-                        required
-                      />
+                      <Button type="button" onClick={buscarPacientePorRut}>
+                        <Search className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="duracion">Duración (min)</Label>
-                      <Select
-                        value={nuevaCita.duracion}
-                        onValueChange={(value) => handleSelectChange("duracion", value)}
-                      >
-                        <SelectTrigger id="duracion">
-                          <SelectValue placeholder="Duración" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="30">30 minutos</SelectItem>
-                          <SelectItem value="45">45 minutos</SelectItem>
-                          <SelectItem value="60">60 minutos</SelectItem>
-                        </SelectContent>
-                      </Select>
+
+                  {isNewPatient ? (
+                    <div className="text-center">
+                      <p className="mb-4">Paciente no encontrado. ¿Desea crear una nueva ficha?</p>
+                      <Button type="submit" className="w-full">
+                        Crear Nueva Ficha
+                      </Button>
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="tipo">Tipo de Cita</Label>
-                      <Select value={nuevaCita.tipo} onValueChange={(value) => handleSelectChange("tipo", value)}>
-                        <SelectTrigger id="tipo">
-                          <SelectValue placeholder="Tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Evaluación">Evaluación</SelectItem>
-                          <SelectItem value="Tratamiento">Tratamiento</SelectItem>
-                          <SelectItem value="Control">Control</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="fecha">Fecha</Label>
+                          <Input
+                            id="fecha"
+                            name="fecha"
+                            type="date"
+                            value={nuevaCita.fecha}
+                            onChange={(e) => setNuevaCita(prev => ({ ...prev, fecha: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="hora">Hora</Label>
+                          <Input
+                            id="hora"
+                            name="hora"
+                            type="time"
+                            value={nuevaCita.hora}
+                            onChange={(e) => setNuevaCita(prev => ({ ...prev, hora: e.target.value }))}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="duracion">Duración</Label>
+                          <Select
+                            value={nuevaCita.duracion}
+                            onValueChange={(value) => setNuevaCita(prev => ({ ...prev, duracion: value }))}
+                          >
+                            <SelectTrigger id="duracion">
+                              <SelectValue placeholder="Duración" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="30">30 minutos</SelectItem>
+                              <SelectItem value="45">45 minutos</SelectItem>
+                              <SelectItem value="60">60 minutos</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="tipo">Tipo</Label>
+                          <Select
+                            value={nuevaCita.tipo}
+                            onValueChange={(value) => setNuevaCita(prev => ({ ...prev, tipo: value }))}
+                          >
+                            <SelectTrigger id="tipo">
+                              <SelectValue placeholder="Tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Evaluación">Evaluación</SelectItem>
+                              <SelectItem value="Tratamiento">Tratamiento</SelectItem>
+                              <SelectItem value="Control">Control</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <DialogFooter>
-                  <Button type="submit">Agendar Cita</Button>
+                  <Button type="submit">
+                    {isNewPatient ? "Crear Nueva Ficha" : "Agendar Cita"}
+                  </Button>
                 </DialogFooter>
               </form>
             </DialogContent>
