@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import type React from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -18,10 +19,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Layout } from "@/components/layout"
-import { pacientesMock } from "@/lib/data"
-import { Clock, Plus, User } from "lucide-react"
-import { getCitas, createCita, Cita } from "@/lib/firestore"
+import { Clock, Plus, Search, User } from "lucide-react"
+import { getCitas, createCita, getPacientes, getPacienteByRut } from "@/lib/firestore"
 import { useToast } from "@/hooks/use-toast"
+import type { Paciente } from "@/lib/data"
 
 // Datos de ejemplo para citas
 const citasMock = [
