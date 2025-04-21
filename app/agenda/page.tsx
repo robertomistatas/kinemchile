@@ -86,11 +86,16 @@ export default function AgendaPage() {
     tipo: "Evaluación",
     estado: "pendiente",
   })
+  const router = useRouter()
 
   useEffect(() => {
     cargarDatos()
   }, [])
 
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedDate(e.target.value)
+  }
+  
   const cargarDatos = async () => {
     try {
       const [citasData, pacientesData] = await Promise.all([getCitas(), getPacientes()])
