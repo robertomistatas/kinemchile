@@ -16,6 +16,28 @@ import { createPaciente } from "@/lib/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { validarRut, formatearRut } from "@/lib/utils"
 
+// Funciones de validación
+const validarTelefono = (telefono: string) => {
+  const telefonoRegex = /^\+56\s?9\s?\d{4}\s?\d{4}$/
+  return telefonoRegex.test(telefono)
+}
+
+const validarEmail = (email: string) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+const validarEdad = (edad: string) => {
+  const edadNum = parseInt(edad)
+  return edadNum >= 0 && edadNum <= 120
+}
+
+const validarFechaNacimiento = (fecha: string) => {
+  const fechaNac = new Date(fecha)
+  const hoy = new Date()
+  return fechaNac <= hoy
+}
+
 export default function NuevoPacientePage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -53,12 +75,34 @@ export default function NuevoPacientePage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
 
+    // Limpiar error previo
+    setFormErrors(prev => ({ ...prev, [name]: "" }))
+
     if (name === "rut") {
-      // Validar RUT cuando cambia
       setRutError("")
-      setFormData((prev) => ({ ...prev, [name]: value }))
+      setFormData(prev => ({ ...prev, [name]: value }))
+    } else if (name === "telefono") {
+      if (value && !validarTelefono(value)) {
+        setFormErrors(prev => ({ ...prev, telefono: "Formato inválido. Use: +56 9 1234 5678" }))
+      }
+      setFormData(prev => ({ ...prev, [name]: value }))
+    } else if (name === "email") {
+      if (value && !validarEmail(value)) {
+        setFormErrors(prev => ({ ...prev, email: "Formato de email inválido" }))
+      }
+      setFormData(prev => ({ ...prev, [name]: value }))
+    } else if (name === "edad") {
+      if (value && !validarEdad(value)) {
+        setFormErrors(prev => ({ ...prev, edad: "La edad debe estar entre 0 y 120 años" }))
+      }
+      setFormData(prev => ({ ...prev, [name]: value }))
+    } else if (name === "fechaNacimiento") {
+      if (value && !validarFechaNacimiento(value)) {
+        setFormErrors(prev => ({ ...prev, fechaNacimiento: "La fecha no puede ser futura" }))
+      }
+      setFormData(prev => ({ ...prev, [name]: value }))
     } else {
-      setFormData((prev) => ({ ...prev, [name]: value }))
+      setFormData(prev => ({ ...prev, [name]: value }))
     }
   }
 
@@ -100,9 +144,24 @@ export default function NuevoPacientePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validar RUT antes de enviar
-    if (formData.rut && !validarRut(formData.rut)) {
-      setRutError("RUT inválido. Por favor, ingrese un RUT válido.")
+    // Validar todos los campos
+    const errores = {
+      telefono: formData.telefono && !validarTelefono(formData.telefono) ? "Teléfono inválido" : "",
+      email: formData.email && !validarEmail(formData.email) ? "Email inválido" : "",
+      edad: formData.edad && !validarEdad(formData.edad) ? "Edad inválida" : "",
+      fechaNacimiento: formData.fechaNacimiento && !validarFechaNacimiento(formData.fechaNacimiento) ? "Fecha inválida" : ""
+    }
+
+    setFormErrors(errores)
+
+    // Verificar si hay errores
+    if (Object.values(errores).some(error => error !== "") || 
+        (formData.rut && !validarRut(formData.rut))) {
+      toast({
+        title: "Error",
+        description: "Por favor corrija los errores en el formulario",
+        variant: "destructive",
+      })
       return
     }
 
@@ -232,21 +291,10 @@ export default function NuevoPacientePage() {
                           value={formData.telefono}
                           onChange={handleChange}
                           placeholder="Ej: +56 9 1234 5678"
+                          className={formErrors.telefono ? "border-red-500" : ""}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="edad">Edad</Label>
-                        <Input
-                          id="edad"
-                          name="edad"
-                          type="number"
-                          value={formData.edad}
-                          onChange={handleChange}
-                          placeholder="Edad del paciente"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        {formErrors.telefono && <p className="text-sm text-red-500">{formErrors.telefono}</p>}
+                      
                         <Input
                           id="email"
                           name="email"
@@ -254,7 +302,30 @@ export default function NuevoPacientePage() {
                           value={formData.email}
                           onChange={handleChange}
                           placeholder="correo@ejemplo.com"
+                          className={formErrors.email ? "border-red-500" : ""}
                         />
+                        {formErrors.email && <p className="text-sm text-red-500">{formErrors.email}</p>}
+                      
+                        <Input
+                          id="edad"
+                          name="edad"
+                          type="number"
+                          value={formData.edad}
+                          onChange={handleChange}
+                          placeholder="Edad del paciente"
+                          className={formErrors.edad ? "border-red-500" : ""}
+                        />
+                        {formErrors.edad && <p className="text-sm text-red-500">{formErrors.edad}</p>}
+                      
+                        <Input
+                          id="fechaNacimiento"
+                          name="fechaNacimiento"
+                          type="date"
+                          value={formData.fechaNacimiento}
+                          onChange={handleChange}
+                          className={formErrors.fechaNacimiento ? "border-red-500" : ""}
+                        />
+                        {formErrors.fechaNacimiento && <p className="text-sm text-red-500">{formErrors.fechaNacimiento}</p>}
                       </div>
                     </div>
                   </div>
@@ -394,3 +465,9 @@ export default function NuevoPacientePage() {
     </Layout>
   )
 }
+const [formErrors, setFormErrors] = useState({
+  telefono: "",
+  email: "",
+  edad: "",
+  fechaNacimiento: ""
+})
