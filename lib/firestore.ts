@@ -143,3 +143,37 @@ export const deleteFicha = async (id: string): Promise<void> => {
   const fichaRef = doc(db, "fichas", id)
   await deleteDoc(fichaRef)
 }
+
+// Interfaces para las citas
+export interface Cita {
+  id?: string
+  pacienteId: string
+  pacienteNombre: string
+  fecha: string
+  hora: string
+  duracion: string
+  tipo: string
+  estado: string
+}
+
+// Funciones CRUD para citas
+export async function getCitas() {
+  const citasRef = collection(db, 'citas')
+  const snapshot = await getDocs(citasRef)
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+}
+
+export async function createCita(data: Omit<Cita, 'id'>) {
+  const citasRef = collection(db, 'citas')
+  return addDoc(citasRef, data)
+}
+
+export async function updateCita(id: string, data: Partial<Cita>) {
+  const citaRef = doc(db, 'citas', id)
+  return updateDoc(citaRef, data)
+}
+
+export async function deleteCita(id: string) {
+  const citaRef = doc(db, 'citas', id)
+  return deleteDoc(citaRef)
+}

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 
 import type React from "react"
@@ -22,6 +23,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Layout } from "@/components/layout"
 import { pacientesMock } from "@/lib/data"
 import { Clock, Plus, User } from "lucide-react"
+import { getCitas, createCita, Cita } from "@/lib/firestore"
+import { useToast } from "@/hooks/use-toast"
 
 // Datos de ejemplo para citas
 const citasMock = [
@@ -68,10 +71,14 @@ const citasMock = [
 ]
 
 export default function AgendaPage() {
-  const [selectedDate, setSelectedDate] = useState<string>("2024-04-05")
+  const { toast } = useToast()
+  const [citas, setCitas] = useState<Cita[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [nuevaCita, setNuevaCita] = useState({
     pacienteId: "",
+    pacienteNombre: "",
     fecha: new Date().toISOString().split("T")[0],
     hora: "09:00",
     duracion: "45",
@@ -79,10 +86,81 @@ export default function AgendaPage() {
     estado: "pendiente",
   })
 
+  // Cargar citas
+  useEffect(() => {
+    const cargarCitas = async () => {
+      try {
+        const citasData = await getCitas()
+        setCitas(citasData)
+      } catch (error) {
+        console.error("Error al cargar citas:", error)
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar las citas",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    cargarCitas()
+  }, [toast])
+
   // Filtrar citas por fecha seleccionada
-  const citasDelDia = citasMock
+  const citasDelDia = citas
     .filter((cita) => cita.fecha === selectedDate)
     .sort((a, b) => a.hora.localeCompare(b.hora))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      // Obtener el nombre del paciente seleccionado
+      const paciente = pacientesMock.find(p => p.id === nuevaCita.pacienteId)
+      if (!paciente) {
+        throw new Error("Paciente no encontrado")
+      }
+
+      const citaData = {
+        ...nuevaCita,
+        pacienteNombre: `${paciente.nombre} ${paciente.apellido}`
+      }
+
+      await createCita(citaData)
+      
+      // Recargar citas
+      const citasActualizadas = await getCitas()
+      setCitas(citasActualizadas)
+
+      toast({
+        title: "Éxito",
+        description: "Cita agendada correctamente",
+      })
+
+      // Cerrar el diálogo y limpiar el formulario
+      setIsDialogOpen(false)
+      setNuevaCita({
+        pacienteId: "",
+        pacienteNombre: "",
+        fecha: new Date().toISOString().split("T")[0],
+        hora: "09:00",
+        duracion: "45",
+        tipo: "Evaluación",
+        estado: "pendiente",
+      })
+    } catch (error) {
+      console.error("Error al crear cita:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo agendar la cita",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedDate(e.target.value)
