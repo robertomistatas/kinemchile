@@ -87,17 +87,21 @@ export default function AgendaPage() {
     estado: "pendiente",
   })
 
-  // Cargar citas
+  // Cargar citas y pacientes
   useEffect(() => {
-    const cargarCitas = async () => {
+    const cargarDatos = async () => {
       try {
-        const citasData = await getCitas()
+        const [citasData, pacientesData] = await Promise.all([
+          getCitas(),
+          getPacientes()
+        ])
         setCitas(citasData)
+        setPacientes(pacientesData)
       } catch (error) {
-        console.error("Error al cargar citas:", error)
+        console.error("Error al cargar datos:", error)
         toast({
           title: "Error",
-          description: "No se pudieron cargar las citas",
+          description: "No se pudieron cargar los datos",
           variant: "destructive",
         })
       } finally {
@@ -105,13 +109,8 @@ export default function AgendaPage() {
       }
     }
 
-    cargarCitas()
+    cargarDatos()
   }, [toast])
-
-  // Filtrar citas por fecha seleccionada
-  const citasDelDia = citas
-    .filter((cita) => cita.fecha === selectedDate)
-    .sort((a, b) => a.hora.localeCompare(b.hora))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -119,7 +118,7 @@ export default function AgendaPage() {
 
     try {
       // Obtener el nombre del paciente seleccionado
-      const paciente = pacientesMock.find(p => p.id === nuevaCita.pacienteId)
+      const paciente = pacientes.find(p => p.id === nuevaCita.pacienteId)
       if (!paciente) {
         throw new Error("Paciente no encontrado")
       }
