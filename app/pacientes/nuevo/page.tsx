@@ -39,15 +39,7 @@ const validarFechaNacimiento = (fecha: string) => {
 }
 
 export default function NuevoPacientePage() {
-  // Añadimos un estado para controlar si estamos en el cliente
-  const [isClient, setIsClient] = useState(false)
-  
-  // Usamos useEffect para establecer isClient a true cuando el componente se monta en el cliente
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-  
-  // Todos los hooks deben declararse aquí, antes de cualquier condicional
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -87,8 +79,11 @@ export default function NuevoPacientePage() {
     ],
   })
 
-  // Si no estamos en el cliente, renderizamos un estado de carga o nada
-  if (!isClient) {
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
     return (
       <Layout>
         <div className="flex min-h-screen items-center justify-center">
