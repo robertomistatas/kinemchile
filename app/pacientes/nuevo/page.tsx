@@ -47,17 +47,7 @@ export default function NuevoPacientePage() {
     setIsClient(true)
   }, [])
   
-  // Si no estamos en el cliente, renderizamos un estado de carga o nada
-  if (!isClient) {
-    return (
-      <Layout>
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        </div>
-      </Layout>
-    )
-  }
-  
+  // Todos los hooks deben declararse aquí, antes de cualquier condicional
   const router = useRouter()
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
@@ -97,6 +87,17 @@ export default function NuevoPacientePage() {
     ],
   })
 
+  // Si no estamos en el cliente, renderizamos un estado de carga o nada
+  if (!isClient) {
+    return (
+      <Layout>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        </div>
+      </Layout>
+    )
+  }
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
 
