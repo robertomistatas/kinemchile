@@ -4,13 +4,13 @@ export interface Paciente {
   nombre: string
   apellido: string
   rut: string
-  fechaNacimiento: string
+  fechaNacimiento: string // Formato YYYY-MM-DD
   genero: string
   direccion?: string
-  telefono: string
+  telefono: string // Formato +56 9 XXXX XXXX
   email?: string
   ocupacion?: string
-  prevision: string
+  prevision: string // Valores específicos permitidos
   contactoEmergencia?: string
   telefonoEmergencia?: string
   antecedentes?: string
@@ -181,3 +181,14 @@ export const fichasMock: FichaClinica[] = [
     observaciones: "Se recomienda evaluación de puesto de trabajo.",
   },
 ]
+
+// Función de validación de paciente
+export function validarPaciente(paciente: Partial<Paciente>): boolean {
+  if (!paciente.nombre || !paciente.apellido || !paciente.rut) return false
+  if (!validarRut(paciente.rut)) return false
+  
+  const fechaRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!fechaRegex.test(paciente.fechaNacimiento)) return false
+  
+  return true
+}

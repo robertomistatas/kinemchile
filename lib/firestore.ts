@@ -84,13 +84,18 @@ export const getPacienteByRut = async (rut: string): Promise<Paciente | null> =>
 }
 
 export const createPaciente = async (paciente: Omit<Paciente, "id">): Promise<string> => {
-  const pacientesRef = collection(db, "pacientes")
-  const docRef = await addDoc(pacientesRef, {
-    ...paciente,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
-  return docRef.id
+  try {
+    const pacientesRef = collection(db, "pacientes")
+    const docRef = await addDoc(pacientesRef, {
+      ...paciente,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    return docRef.id
+  } catch (error) {
+    console.error('Error al crear paciente:', error)
+    throw new Error('No se pudo crear el paciente')
+  }
 }
 
 export const updatePaciente = async (id: string, paciente: Partial<Paciente>): Promise<void> => {

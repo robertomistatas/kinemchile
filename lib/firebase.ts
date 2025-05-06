@@ -20,4 +20,9 @@ const auth = getAuth(app)
 const db = getFirestore(app)
 const storage = getStorage(app)
 
+// Agregar validación de inicialización
+if (!app || !auth || !db || !storage) {
+  throw new Error('Error al inicializar Firebase')
+}
+
 export { app, auth, db, storage }

@@ -7,11 +7,13 @@ export function cn(...inputs: ClassValue[]) {
 
 // Función para validar RUT chileno
 export function validarRut(rut: string): boolean {
+  if (!rut || typeof rut !== 'string') return false
+  
   // Eliminar puntos y guión
-  const rutLimpio = rut.replace(/\./g, "").replace("-", "")
+  const rutLimpio = rut.replace(/[.-]/g, "").toUpperCase()
 
-  // Verificar que el RUT tenga al menos 2 caracteres
-  if (rutLimpio.length < 2) return false
+  // Verificar que el RUT tenga al menos 2 caracteres y no más de 10
+  if (rutLimpio.length < 2 || rutLimpio.length > 10) return false
 
   // Obtener el dígito verificador
   const dv = rutLimpio.charAt(rutLimpio.length - 1)
