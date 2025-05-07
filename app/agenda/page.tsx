@@ -21,9 +21,9 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Edit, Trash2, Clock } from "lucide-react"
+import { PacienteCombobox } from "@/components/paciente-combobox"
 
 // Tipo para las citas
 interface Cita {
@@ -49,6 +49,9 @@ export default function AgendaPage() {
     hora: "09:00",
     motivo: "",
   })
+  const [dataLoading, setDataLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -59,10 +62,13 @@ export default function AgendaPage() {
   useEffect(() => {
     async function fetchPacientes() {
       try {
+        setDataLoading(true)
         const data = await getPacientesActivos()
         setPacientes(data)
       } catch (error) {
         console.error("Error al cargar pacientes:", error)
+      } finally {
+        setDataLoading(false)
       }
     }
 
@@ -258,22 +264,13 @@ export default function AgendaPage() {
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
                   <Label htmlFor="paciente">Paciente</Label>
-                  <Select
-                    value={formData.pacienteId}
-                    onValueChange={(value) => handleSelectChange("pacienteId", value)}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecciona un paciente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pacientes.map((paciente) => (
-                        <SelectItem key={paciente.id} value={paciente.id}>
-                          {paciente.nombre} {paciente.apellido} - {paciente.rut}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <PacienteCombobox
+                    pacientes={pacientes}
+                    selectedPacienteId={formData.pacienteId}
+                    onSelect={(value) => handleSelectChange("pacienteId", value)}
+                    disabled={dataLoading || submitting || success}
+                    placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

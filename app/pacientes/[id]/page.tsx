@@ -50,8 +50,12 @@ export default function PacienteDetallePage() {
         const pacienteData = await getPaciente(id)
         setPaciente(pacienteData)
 
-        const sesionesData = await getSesionesPaciente(id)
-        setSesiones(sesionesData)
+        if (pacienteData) {
+          console.log(`Cargando sesiones para el paciente ${id}`)
+          const sesionesData = await getSesionesPaciente(id)
+          console.log(`Sesiones cargadas: ${sesionesData.length}`)
+          setSesiones(sesionesData)
+        }
       } catch (error) {
         console.error("Error al cargar datos:", error)
         setError("No se pudo cargar la información del paciente")
@@ -167,6 +171,10 @@ export default function PacienteDetallePage() {
       console.error("Error al reactivar al paciente:", error)
       setError("Error al procesar la solicitud de reactivación")
     }
+  }
+
+  const handleAddEvaluacion = () => {
+    router.push(`/prestaciones/nueva?pacienteId=${id}&tipo=Evaluación`)
   }
 
   if (loading || !user) {
@@ -378,9 +386,11 @@ export default function PacienteDetallePage() {
                     {sesiones.map((sesion) => (
                       <TableRow key={sesion.id}>
                         <TableCell>
-                          {typeof sesion.fecha === "string"
-                            ? sesion.fecha
-                            : new Date(sesion.fecha).toLocaleDateString()}
+                          {typeof sesion.fecha === "number"
+                            ? new Date(sesion.fecha).toLocaleDateString()
+                            : typeof sesion.fecha === "string"
+                              ? sesion.fecha
+                              : "Fecha no disponible"}
                         </TableCell>
                         <TableCell>{sesion.tipo}</TableCell>
                         <TableCell>{sesion.notas}</TableCell>
@@ -395,7 +405,9 @@ export default function PacienteDetallePage() {
             <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Evaluaciones</h2>
             <div className="rounded-md border p-8 text-center">
               <p className="text-muted-foreground">No hay evaluaciones registradas para este paciente.</p>
-              <Button className="mt-4 print:hidden">Añadir Evaluación</Button>
+              <Button className="mt-4 print:hidden" onClick={handleAddEvaluacion}>
+                Añadir Evaluación
+              </Button>
             </div>
           </TabsContent>
         </Tabs>

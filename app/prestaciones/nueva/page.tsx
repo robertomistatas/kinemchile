@@ -17,19 +17,21 @@ import { getPacientesActivos, getPaciente, crearSesion } from "@/lib/firestore"
 import type { Paciente } from "@/lib/data"
 import Link from "next/link"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { PacienteCombobox } from "@/components/paciente-combobox"
 
 export default function NuevaSesionPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const pacienteIdParam = searchParams.get("pacienteId")
+  const tipoParam = searchParams.get("tipo")
 
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [selectedPacienteId, setSelectedPacienteId] = useState<string>(pacienteIdParam || "")
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null)
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split("T")[0],
-    tipo: "Evaluación",
+    tipo: tipoParam || "Evaluación",
     notas: "",
   })
   const [dataLoading, setDataLoading] = useState(true)
@@ -186,22 +188,13 @@ export default function NuevaSesionPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="pacienteId">Paciente</Label>
-                <Select
-                  value={selectedPacienteId}
-                  onValueChange={(value) => handleSelectChange("pacienteId", value)}
+                <PacienteCombobox
+                  pacientes={pacientes}
+                  selectedPacienteId={selectedPacienteId}
+                  onSelect={(value) => handleSelectChange("pacienteId", value)}
                   disabled={dataLoading || submitting || success || !!pacienteIdParam}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={dataLoading ? "Cargando pacientes..." : "Selecciona un paciente"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pacientes.map((paciente) => (
-                      <SelectItem key={paciente.id} value={paciente.id}>
-                        {paciente.nombre} {paciente.apellido} - {paciente.rut}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
+                />
               </div>
 
               {selectedPaciente && (
