@@ -32,6 +32,7 @@ export default function PacienteDetallePage() {
   const { id } = useParams() as { id: string }
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [sesiones, setSesiones] = useState<Sesion[]>([])
+  const [evaluaciones, setEvaluaciones] = useState<Sesion[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [error, setError] = useState("")
   const [notasAlta, setNotasAlta] = useState("")
@@ -43,27 +44,42 @@ export default function PacienteDetallePage() {
     }
   }, [user, loading, router])
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        setDataLoading(true)
-        const pacienteData = await getPaciente(id)
-        setPaciente(pacienteData)
+  // Función para cargar los datos del paciente y sus sesiones
+  const fetchData = async () => {
+    try {
+      setDataLoading(true)
+      setError("")
 
-        if (pacienteData) {
-          console.log(`Cargando sesiones para el paciente ${id}`)
-          const sesionesData = await getSesionesPaciente(id)
-          console.log(`Sesiones cargadas: ${sesionesData.length}`)
-          setSesiones(sesionesData)
-        }
-      } catch (error) {
-        console.error("Error al cargar datos:", error)
-        setError("No se pudo cargar la información del paciente")
-      } finally {
+      console.log(`Cargando datos del paciente ${id}`)
+      const pacienteData = await getPaciente(id)
+
+      if (!pacienteData) {
+        setError("No se encontró el paciente")
         setDataLoading(false)
+        return
       }
-    }
 
+      setPaciente(pacienteData)
+
+      console.log(`Cargando sesiones para el paciente ${id}`)
+      const sesionesData = await getSesionesPaciente(id)
+      console.log(`Sesiones cargadas: ${sesionesData.length}`)
+
+      // Separar sesiones y evaluaciones
+      const evaluacionesData = sesionesData.filter((s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación")
+      const otherSesiones = sesionesData.filter((s) => s.tipo !== "Evaluación" && s.tipo !== "Reevaluación")
+
+      setSesiones(otherSesiones)
+      setEvaluaciones(evaluacionesData)
+    } catch (error) {
+      console.error("Error al cargar datos:", error)
+      setError("No se pudo cargar la información del paciente")
+    } finally {
+      setDataLoading(false)
+    }
+  }
+
+  useEffect(() => {
     if (user && id) {
       fetchData()
     }
@@ -105,16 +121,16 @@ export default function PacienteDetallePage() {
     }
 
     // Sesiones
-    if (sesiones.length > 0) {
+    if (sesiones.length > 0 || evaluaciones.length > 0) {
       doc.addPage()
       doc.setFontSize(16)
-      doc.text("Historial de Sesiones", 105, 15, { align: "center" })
+      doc.text("Historial de Sesiones y Evaluaciones", 105, 15, { align: "center" })
 
       // @ts-ignore
       doc.autoTable({
         startY: 25,
         head: [["Fecha", "Tipo", "Notas"]],
-        body: sesiones.map((sesion) => [
+        body: [...sesiones, ...evaluaciones].map((sesion) => [
           typeof sesion.fecha === "string" ? sesion.fecha : new Date(sesion.fecha).toLocaleDateString(),
           sesion.tipo,
           sesion.notas,
@@ -129,6 +145,7 @@ export default function PacienteDetallePage() {
     if (!paciente) return
 
     try {
+      setError("")
       await actualizarPaciente(id, {
         activo: false,
         fechaAlta: new Date().toISOString(),
@@ -154,27 +171,31 @@ export default function PacienteDetallePage() {
     if (!paciente) return
 
     try {
+      setError("")
+      setDataLoading(true)
+
+      // Actualizar en la base de datos
       await actualizarPaciente(id, {
         activo: true,
-        fechaAlta: undefined,
-        notasAlta: undefined,
+        fechaAlta: null,
+        notasAlta: null,
       })
 
-      // Actualizar el estado local
-      setPaciente({
-        ...paciente,
-        activo: true,
-        fechaAlta: undefined,
-        notasAlta: undefined,
-      })
+      // Volver a cargar los datos del paciente para asegurar consistencia
+      await fetchData()
     } catch (error) {
       console.error("Error al reactivar al paciente:", error)
       setError("Error al procesar la solicitud de reactivación")
+      setDataLoading(false)
     }
   }
 
   const handleAddEvaluacion = () => {
     router.push(`/prestaciones/nueva?pacienteId=${id}&tipo=Evaluación`)
+  }
+
+  const handleAddSesion = () => {
+    router.push(`/prestaciones/nueva?pacienteId=${id}&tipo=Tratamiento`)
   }
 
   if (loading || !user) {
@@ -368,8 +389,8 @@ export default function PacienteDetallePage() {
             {sesiones.length === 0 ? (
               <div className="rounded-md border p-8 text-center">
                 <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
-                <Button asChild className="mt-4 print:hidden">
-                  <Link href={`/prestaciones/nueva?pacienteId=${id}`}>Añadir Sesión</Link>
+                <Button className="mt-4 print:hidden" onClick={handleAddSesion}>
+                  Añadir Sesión
                 </Button>
               </div>
             ) : (
@@ -398,17 +419,56 @@ export default function PacienteDetallePage() {
                     ))}
                   </TableBody>
                 </Table>
+                <div className="p-4 flex justify-end">
+                  <Button onClick={handleAddSesion} className="print:hidden">
+                    Añadir Sesión
+                  </Button>
+                </div>
               </div>
             )}
           </TabsContent>
           <TabsContent value="evaluaciones" className="space-y-4">
             <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Evaluaciones</h2>
-            <div className="rounded-md border p-8 text-center">
-              <p className="text-muted-foreground">No hay evaluaciones registradas para este paciente.</p>
-              <Button className="mt-4 print:hidden" onClick={handleAddEvaluacion}>
-                Añadir Evaluación
-              </Button>
-            </div>
+            {evaluaciones.length === 0 ? (
+              <div className="rounded-md border p-8 text-center">
+                <p className="text-muted-foreground">No hay evaluaciones registradas para este paciente.</p>
+                <Button className="mt-4 print:hidden" onClick={handleAddEvaluacion}>
+                  Añadir Evaluación
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Notas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {evaluaciones.map((evaluacion) => (
+                      <TableRow key={evaluacion.id}>
+                        <TableCell>
+                          {typeof evaluacion.fecha === "number"
+                            ? new Date(evaluacion.fecha).toLocaleDateString()
+                            : typeof evaluacion.fecha === "string"
+                              ? evaluacion.fecha
+                              : "Fecha no disponible"}
+                        </TableCell>
+                        <TableCell>{evaluacion.tipo}</TableCell>
+                        <TableCell>{evaluacion.notas}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="p-4 flex justify-end">
+                  <Button onClick={handleAddEvaluacion} className="print:hidden">
+                    Añadir Evaluación
+                  </Button>
+                </div>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

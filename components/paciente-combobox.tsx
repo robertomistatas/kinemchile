@@ -24,9 +24,21 @@ export function PacienteCombobox({
   placeholder = "Buscar paciente...",
 }: PacienteComboboxProps) {
   const [open, setOpen] = React.useState(false)
+  const [searchValue, setSearchValue] = React.useState("")
 
   // Encontrar el paciente seleccionado
   const selectedPaciente = pacientes.find((p) => p.id === selectedPacienteId)
+
+  // Filtrar pacientes según el término de búsqueda
+  const filteredPacientes = pacientes.filter((paciente) => {
+    const searchTerm = searchValue.toLowerCase()
+    return (
+      paciente.nombre.toLowerCase().includes(searchTerm) ||
+      paciente.apellido.toLowerCase().includes(searchTerm) ||
+      paciente.rut.toLowerCase().includes(searchTerm) ||
+      `${paciente.nombre} ${paciente.apellido}`.toLowerCase().includes(searchTerm)
+    )
+  })
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -46,11 +58,11 @@ export function PacienteCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-full p-0">
         <Command>
-          <CommandInput placeholder={placeholder} />
+          <CommandInput placeholder={placeholder} value={searchValue} onValueChange={setSearchValue} />
           <CommandList>
             <CommandEmpty>No se encontraron pacientes.</CommandEmpty>
             <CommandGroup className="max-h-64 overflow-y-auto">
-              {pacientes.map((paciente) => (
+              {filteredPacientes.map((paciente) => (
                 <CommandItem
                   key={paciente.id}
                   value={`${paciente.nombre} ${paciente.apellido} ${paciente.rut}`}

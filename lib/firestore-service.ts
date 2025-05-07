@@ -117,7 +117,11 @@ export async function actualizarPaciente(id: string, paciente: Partial<Omit<Paci
   try {
     console.log(`Actualizando paciente con ID: ${id}`)
     const docRef = doc(firestore, "pacientes", id)
-    await updateDoc(docRef, paciente)
+
+    // Convertir valores null a deleteField() para eliminar el campo
+    const updateData = { ...paciente }
+
+    await updateDoc(docRef, updateData)
     console.log("Paciente actualizado correctamente")
   } catch (error) {
     console.error("Error al actualizar paciente:", error)
@@ -170,10 +174,17 @@ export async function getSesiones(): Promise<Sesion[]> {
     const q = query(sesionesRef, orderBy("fecha", "desc"))
     const snapshot = await getDocs(q)
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Sesion[]
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      // Asegurarse de que la fecha sea un número o string
+      const fecha = typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha
+
+      return {
+        id: doc.id,
+        ...data,
+        fecha,
+      }
+    }) as Sesion[]
   } catch (error) {
     console.error("Error al obtener sesiones:", error)
     return []
@@ -190,9 +201,14 @@ export async function getSesion(id: string): Promise<Sesion | null> {
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
+      const data = docSnap.data()
+      // Asegurarse de que la fecha sea un número o string
+      const fecha = typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha
+
       return {
         id: docSnap.id,
-        ...docSnap.data(),
+        ...data,
+        fecha,
       } as Sesion
     }
 
