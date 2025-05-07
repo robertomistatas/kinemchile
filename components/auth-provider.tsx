@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "@/lib/firebase"
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, initFirebase } from "@/lib/firebase"
 
 // Tipos para Firebase Auth
 interface User {
@@ -37,54 +37,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Solo ejecutar en el cliente
     if (typeof window === "undefined") return
 
-    const setupAuth = async () => {
-      try {
-        console.log("Configurando listener de autenticación")
+    // Asegurarse de que Firebase esté inicializado
+    const { auth: firebaseAuth } = initFirebase()
 
-        // Verificar que auth existe
-        if (!auth) {
-          console.error("Auth no está inicializado")
-          setLoading(false)
-          return
-        }
-
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-          console.log("Estado de autenticación cambiado:", firebaseUser ? "Usuario autenticado" : "No hay usuario")
-
-          if (firebaseUser) {
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-            })
-          } else {
-            setUser(null)
-          }
-
-          setLoading(false)
-        })
-
-        return () => {
-          console.log("Limpiando listener de autenticación")
-          unsubscribe()
-        }
-      } catch (error) {
-        console.error("Error en setupAuth:", error)
-        setLoading(false)
-      }
+    if (!firebaseAuth) {
+      console.error("No se pudo inicializar Firebase Auth")
+      setLoading(false)
+      return
     }
 
-    setupAuth()
+    console.log("Configurando listener de autenticación")
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (firebaseUser) => {
+      console.log("Estado de autenticación cambiado:", firebaseUser ? "Usuario autenticado" : "No hay usuario")
+
+      if (firebaseUser) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+        })
+      } else {
+        setUser(null)
+      }
+
+      setLoading(false)
+    })
+
+    return () => {
+      console.log("Limpiando listener de autenticación")
+      unsubscribe()
+    }
   }, [])
 
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
-      if (!auth) throw new Error("Auth no está inicializado")
+      // Asegurarse de que Firebase esté inicializado
+      const { auth: firebaseAuth } = initFirebase()
+      if (!firebaseAuth) {
+        throw new Error("Auth no está inicializado")
+      }
 
       console.log("Intentando iniciar sesión con:", email)
-      await signInWithEmailAndPassword(auth, email, password)
-      console.log("Inicio de sesión exitoso")
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password)
+      console.log("Inicio de sesión exitoso:", userCredential.user.uid)
       router.push("/dashboard")
+      return userCredential
     } catch (error) {
       console.error("Error al iniciar sesión:", error)
       throw error
@@ -96,9 +93,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setLoading(true)
     try {
-      if (!auth) throw new Error("Auth no está inicializado")
+      // Asegurarse de que Firebase esté inicializado
+      const { auth: firebaseAuth } = initFirebase()
+      if (!firebaseAuth) {
+        throw new Error("Auth no está inicializado")
+      }
 
-      await signOut(auth)
+      await signOut(firebaseAuth)
       router.push("/login")
     } catch (error) {
       console.error("Error al cerrar sesión:", error)

@@ -2,12 +2,7 @@ import type React from "react"
 import "@/app/globals.css"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
-import dynamic from "next/dynamic"
-
-// Importar el AuthProvider de forma dinámica para que solo se cargue en el cliente
-const ClientAuthProvider = dynamic(() => import("@/components/auth-provider"), {
-  ssr: false,
-})
+import { ClientWrapper } from "@/components/client-wrapper"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -26,7 +21,7 @@ export default function RootLayout({
     <html lang="es">
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <ClientAuthProvider>{children}</ClientAuthProvider>
+          <ClientWrapper>{children}</ClientWrapper>
         </ThemeProvider>
       </body>
     </html>

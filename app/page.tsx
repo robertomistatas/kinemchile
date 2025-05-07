@@ -1,10 +1,14 @@
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Heart } from "lucide-react"
+import FirebaseClientInitializer from "./firebase-client-initializer"
 
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Inicializar Firebase solo en el cliente */}
+      <FirebaseClientInitializer />
+
       <header className="sticky top-0 z-10 border-b bg-background">
         <div className="container flex h-16 items-center justify-between py-4">
           <div className="flex items-center gap-2">

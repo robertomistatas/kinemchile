@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  db,
+  initFirebase,
   collection,
   query,
   where,
@@ -16,16 +16,23 @@ import {
 } from "@/lib/firebase"
 import type { Paciente, Sesion } from "./data"
 
+// Función para obtener la instancia de Firestore
+function getDb() {
+  const { db: firestore } = initFirebase()
+  if (!firestore) {
+    console.error("Firestore no está inicializado")
+  }
+  return firestore
+}
+
 // Funciones para pacientes
 export async function getPacientes(): Promise<Paciente[]> {
-  if (!db) {
-    console.error("Firestore no está inicializado")
-    return []
-  }
+  const firestore = getDb()
+  if (!firestore) return []
 
   try {
     console.log("Obteniendo pacientes...")
-    const pacientesRef = collection(db, "pacientes")
+    const pacientesRef = collection(firestore, "pacientes")
     const q = query(pacientesRef, orderBy("createdAt", "desc"))
     const snapshot = await getDocs(q)
 
@@ -40,14 +47,12 @@ export async function getPacientes(): Promise<Paciente[]> {
 }
 
 export async function getPacientesActivos(): Promise<Paciente[]> {
-  if (!db) {
-    console.error("Firestore no está inicializado")
-    return []
-  }
+  const firestore = getDb()
+  if (!firestore) return []
 
   try {
     console.log("Obteniendo pacientes activos...")
-    const pacientesRef = collection(db, "pacientes")
+    const pacientesRef = collection(firestore, "pacientes")
     const q = query(pacientesRef, where("activo", "==", true), orderBy("createdAt", "desc"))
     const snapshot = await getDocs(q)
 
@@ -62,14 +67,12 @@ export async function getPacientesActivos(): Promise<Paciente[]> {
 }
 
 export async function getPaciente(id: string): Promise<Paciente | null> {
-  if (!db) {
-    console.error("Firestore no está inicializado")
-    return null
-  }
+  const firestore = getDb()
+  if (!firestore) return null
 
   try {
     console.log(`Obteniendo paciente con ID: ${id}`)
-    const docRef = doc(db, "pacientes", id)
+    const docRef = doc(firestore, "pacientes", id)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
@@ -87,7 +90,8 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
 }
 
 export async function crearPaciente(paciente: Omit<Paciente, "id" | "createdAt" | "activo">) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log("Creando nuevo paciente...")
@@ -97,7 +101,7 @@ export async function crearPaciente(paciente: Omit<Paciente, "id" | "createdAt" 
       createdAt: serverTimestamp(),
     }
 
-    const docRef = await addDoc(collection(db, "pacientes"), pacienteData)
+    const docRef = await addDoc(collection(firestore, "pacientes"), pacienteData)
     console.log(`Paciente creado con ID: ${docRef.id}`)
     return docRef.id
   } catch (error) {
@@ -107,11 +111,12 @@ export async function crearPaciente(paciente: Omit<Paciente, "id" | "createdAt" 
 }
 
 export async function actualizarPaciente(id: string, paciente: Partial<Omit<Paciente, "id" | "createdAt">>) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log(`Actualizando paciente con ID: ${id}`)
-    const docRef = doc(db, "pacientes", id)
+    const docRef = doc(firestore, "pacientes", id)
     await updateDoc(docRef, paciente)
     console.log("Paciente actualizado correctamente")
   } catch (error) {
@@ -121,11 +126,12 @@ export async function actualizarPaciente(id: string, paciente: Partial<Omit<Paci
 }
 
 export async function darDeAltaPaciente(id: string, notas: string) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log(`Dando de alta al paciente con ID: ${id}`)
-    const docRef = doc(db, "pacientes", id)
+    const docRef = doc(firestore, "pacientes", id)
     await updateDoc(docRef, {
       activo: false,
       fechaAlta: new Date().toISOString(),
@@ -139,11 +145,12 @@ export async function darDeAltaPaciente(id: string, notas: string) {
 }
 
 export async function eliminarPaciente(id: string) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log(`Eliminando paciente con ID: ${id}`)
-    const docRef = doc(db, "pacientes", id)
+    const docRef = doc(firestore, "pacientes", id)
     await deleteDoc(docRef)
     console.log("Paciente eliminado correctamente")
   } catch (error) {
@@ -154,14 +161,12 @@ export async function eliminarPaciente(id: string) {
 
 // Funciones para sesiones
 export async function getSesiones(): Promise<Sesion[]> {
-  if (!db) {
-    console.error("Firestore no está inicializado")
-    return []
-  }
+  const firestore = getDb()
+  if (!firestore) return []
 
   try {
     console.log("Obteniendo sesiones...")
-    const sesionesRef = collection(db, "sesiones")
+    const sesionesRef = collection(firestore, "sesiones")
     const q = query(sesionesRef, orderBy("fecha", "desc"))
     const snapshot = await getDocs(q)
 
@@ -176,14 +181,12 @@ export async function getSesiones(): Promise<Sesion[]> {
 }
 
 export async function getSesion(id: string): Promise<Sesion | null> {
-  if (!db) {
-    console.error("Firestore no está inicializado")
-    return null
-  }
+  const firestore = getDb()
+  if (!firestore) return null
 
   try {
     console.log(`Obteniendo sesión con ID: ${id}`)
-    const docRef = doc(db, "sesiones", id)
+    const docRef = doc(firestore, "sesiones", id)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
@@ -201,14 +204,12 @@ export async function getSesion(id: string): Promise<Sesion | null> {
 }
 
 export async function getSesionesPaciente(pacienteId: string): Promise<Sesion[]> {
-  if (!db) {
-    console.error("Firestore no está inicializado")
-    return []
-  }
+  const firestore = getDb()
+  if (!firestore) return []
 
   try {
     console.log(`Obteniendo sesiones del paciente con ID: ${pacienteId}`)
-    const sesionesRef = collection(db, "sesiones")
+    const sesionesRef = collection(firestore, "sesiones")
     const q = query(sesionesRef, where("pacienteId", "==", pacienteId), orderBy("fecha", "desc"))
     const snapshot = await getDocs(q)
 
@@ -223,7 +224,8 @@ export async function getSesionesPaciente(pacienteId: string): Promise<Sesion[]>
 }
 
 export async function crearSesion(sesion: Omit<Sesion, "id" | "createdAt">) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log("Creando nueva sesión...")
@@ -232,7 +234,7 @@ export async function crearSesion(sesion: Omit<Sesion, "id" | "createdAt">) {
       createdAt: serverTimestamp(),
     }
 
-    const docRef = await addDoc(collection(db, "sesiones"), sesionData)
+    const docRef = await addDoc(collection(firestore, "sesiones"), sesionData)
     console.log(`Sesión creada con ID: ${docRef.id}`)
     return docRef.id
   } catch (error) {
@@ -242,11 +244,12 @@ export async function crearSesion(sesion: Omit<Sesion, "id" | "createdAt">) {
 }
 
 export async function actualizarSesion(id: string, sesion: Partial<Omit<Sesion, "id" | "createdAt">>) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log(`Actualizando sesión con ID: ${id}`)
-    const docRef = doc(db, "sesiones", id)
+    const docRef = doc(firestore, "sesiones", id)
     await updateDoc(docRef, sesion)
     console.log("Sesión actualizada correctamente")
   } catch (error) {
@@ -256,11 +259,12 @@ export async function actualizarSesion(id: string, sesion: Partial<Omit<Sesion, 
 }
 
 export async function eliminarSesion(id: string) {
-  if (!db) throw new Error("Firestore no está inicializado")
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log(`Eliminando sesión con ID: ${id}`)
-    const docRef = doc(db, "sesiones", id)
+    const docRef = doc(firestore, "sesiones", id)
     await deleteDoc(docRef)
     console.log("Sesión eliminada correctamente")
   } catch (error) {
