@@ -37,6 +37,7 @@ export default function PacienteDetallePage() {
   const [error, setError] = useState("")
   const [notasAlta, setNotasAlta] = useState("")
   const [showAltaDialog, setShowAltaDialog] = useState(false)
+  const [activeTab, setActiveTab] = useState("sesiones")
 
   useEffect(() => {
     if (!loading && !user) {
@@ -217,7 +218,7 @@ export default function PacienteDetallePage() {
       <Layout>
         <div className="flex flex-col gap-6">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" asChild>
+            <Button variant="outline" size="icon" asChild className="no-print">
               <Link href="/pacientes">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
@@ -228,7 +229,7 @@ export default function PacienteDetallePage() {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>El paciente que estás buscando no existe o no se pudo cargar.</AlertDescription>
           </Alert>
-          <Button asChild>
+          <Button asChild className="no-print">
             <Link href="/pacientes">Volver a la lista de pacientes</Link>
           </Button>
         </div>
@@ -238,10 +239,10 @@ export default function PacienteDetallePage() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 print:p-10">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
+      <div className="flex flex-col gap-6 print-area">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between no-print">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" asChild className="print:hidden">
+            <Button variant="outline" size="icon" asChild className="no-print">
               <Link href="/pacientes">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
@@ -249,18 +250,18 @@ export default function PacienteDetallePage() {
             <h1 className="text-3xl font-bold tracking-tight">Ficha del Paciente</h1>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handlePrint} className="print:hidden">
+            <Button variant="outline" onClick={handlePrint} className="no-print">
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
             </Button>
-            <Button variant="outline" onClick={handleExportPDF} className="print:hidden">
+            <Button variant="outline" onClick={handleExportPDF} className="no-print">
               <FileDown className="mr-2 h-4 w-4" />
               Exportar PDF
             </Button>
             {paciente.activo ? (
               <Dialog open={showAltaDialog} onOpenChange={setShowAltaDialog}>
                 <DialogTrigger asChild>
-                  <Button variant="default" className="print:hidden">
+                  <Button variant="default" className="no-print">
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Dar de Alta
                   </Button>
@@ -293,7 +294,7 @@ export default function PacienteDetallePage() {
                 </DialogContent>
               </Dialog>
             ) : (
-              <Button variant="default" onClick={handleReactivarPaciente} className="print:hidden">
+              <Button variant="default" onClick={handleReactivarPaciente} className="no-print">
                 <XCircle className="mr-2 h-4 w-4" />
                 Quitar Alta
               </Button>
@@ -308,7 +309,7 @@ export default function PacienteDetallePage() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
-          <Card>
+          <Card className="card">
             <CardHeader>
               <CardTitle>Información Personal</CardTitle>
               <CardDescription>Datos personales del paciente</CardDescription>
@@ -345,7 +346,7 @@ export default function PacienteDetallePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card">
             <CardHeader>
               <CardTitle>Información Clínica</CardTitle>
               <CardDescription>Datos clínicos del paciente</CardDescription>
@@ -379,98 +380,173 @@ export default function PacienteDetallePage() {
           </Card>
         </div>
 
-        <Tabs defaultValue="sesiones" className="print:mt-8">
-          <TabsList className="print:hidden">
-            <TabsTrigger value="sesiones">Historial de Sesiones</TabsTrigger>
-            <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
-          </TabsList>
-          <TabsContent value="sesiones" className="space-y-4">
-            <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Historial de Sesiones</h2>
-            {sesiones.length === 0 ? (
-              <div className="rounded-md border p-8 text-center">
-                <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
-                <Button className="mt-4 print:hidden" onClick={handleAddSesion}>
-                  Añadir Sesión
-                </Button>
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Notas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sesiones.map((sesion) => (
-                      <TableRow key={sesion.id}>
-                        <TableCell>
-                          {typeof sesion.fecha === "number"
-                            ? new Date(sesion.fecha).toLocaleDateString()
-                            : typeof sesion.fecha === "string"
-                              ? sesion.fecha
-                              : "Fecha no disponible"}
-                        </TableCell>
-                        <TableCell>{sesion.tipo}</TableCell>
-                        <TableCell>{sesion.notas}</TableCell>
+        <div className="page">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="print:mt-8">
+            <TabsList className="no-print">
+              <TabsTrigger value="sesiones">Historial de Sesiones</TabsTrigger>
+              <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
+            </TabsList>
+
+            {/* Para impresión, mostrar ambas secciones */}
+            <div className="hidden print:block print:mb-6">
+              <h2 className="text-2xl font-bold tracking-tight print:mb-4">Historial de Sesiones</h2>
+              {sesiones.length === 0 ? (
+                <div className="rounded-md border p-8 text-center">
+                  <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Notas</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <div className="p-4 flex justify-end">
-                  <Button onClick={handleAddSesion} className="print:hidden">
+                    </TableHeader>
+                    <TableBody>
+                      {sesiones.map((sesion) => (
+                        <TableRow key={sesion.id}>
+                          <TableCell>
+                            {typeof sesion.fecha === "number"
+                              ? new Date(sesion.fecha).toLocaleDateString()
+                              : typeof sesion.fecha === "string"
+                                ? sesion.fecha
+                                : "Fecha no disponible"}
+                          </TableCell>
+                          <TableCell>{sesion.tipo}</TableCell>
+                          <TableCell>{sesion.notas}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <h2 className="text-2xl font-bold tracking-tight print:mt-8 print:mb-4">Evaluaciones</h2>
+              {evaluaciones.length === 0 ? (
+                <div className="rounded-md border p-8 text-center">
+                  <p className="text-muted-foreground">No hay evaluaciones registradas para este paciente.</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Notas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {evaluaciones.map((evaluacion) => (
+                        <TableRow key={evaluacion.id}>
+                          <TableCell>
+                            {typeof evaluacion.fecha === "number"
+                              ? new Date(evaluacion.fecha).toLocaleDateString()
+                              : typeof evaluacion.fecha === "string"
+                                ? evaluacion.fecha
+                                : "Fecha no disponible"}
+                          </TableCell>
+                          <TableCell>{evaluacion.tipo}</TableCell>
+                          <TableCell>{evaluacion.notas}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+
+            {/* Para visualización en pantalla */}
+            <TabsContent value="sesiones" className="space-y-4 print:hidden">
+              <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Historial de Sesiones</h2>
+              {sesiones.length === 0 ? (
+                <div className="rounded-md border p-8 text-center">
+                  <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
+                  <Button className="mt-4 no-print" onClick={handleAddSesion}>
                     Añadir Sesión
                   </Button>
                 </div>
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="evaluaciones" className="space-y-4">
-            <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Evaluaciones</h2>
-            {evaluaciones.length === 0 ? (
-              <div className="rounded-md border p-8 text-center">
-                <p className="text-muted-foreground">No hay evaluaciones registradas para este paciente.</p>
-                <Button className="mt-4 print:hidden" onClick={handleAddEvaluacion}>
-                  Añadir Evaluación
-                </Button>
-              </div>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Notas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {evaluaciones.map((evaluacion) => (
-                      <TableRow key={evaluacion.id}>
-                        <TableCell>
-                          {typeof evaluacion.fecha === "number"
-                            ? new Date(evaluacion.fecha).toLocaleDateString()
-                            : typeof evaluacion.fecha === "string"
-                              ? evaluacion.fecha
-                              : "Fecha no disponible"}
-                        </TableCell>
-                        <TableCell>{evaluacion.tipo}</TableCell>
-                        <TableCell>{evaluacion.notas}</TableCell>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Notas</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <div className="p-4 flex justify-end">
-                  <Button onClick={handleAddEvaluacion} className="print:hidden">
+                    </TableHeader>
+                    <TableBody>
+                      {sesiones.map((sesion) => (
+                        <TableRow key={sesion.id}>
+                          <TableCell>
+                            {typeof sesion.fecha === "number"
+                              ? new Date(sesion.fecha).toLocaleDateString()
+                              : typeof sesion.fecha === "string"
+                                ? sesion.fecha
+                                : "Fecha no disponible"}
+                          </TableCell>
+                          <TableCell>{sesion.tipo}</TableCell>
+                          <TableCell>{sesion.notas}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="p-4 flex justify-end">
+                    <Button onClick={handleAddSesion} className="no-print">
+                      Añadir Sesión
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="evaluaciones" className="space-y-4 print:hidden">
+              <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Evaluaciones</h2>
+              {evaluaciones.length === 0 ? (
+                <div className="rounded-md border p-8 text-center">
+                  <p className="text-muted-foreground">No hay evaluaciones registradas para este paciente.</p>
+                  <Button className="mt-4 no-print" onClick={handleAddEvaluacion}>
                     Añadir Evaluación
                   </Button>
                 </div>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Notas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {evaluaciones.map((evaluacion) => (
+                        <TableRow key={evaluacion.id}>
+                          <TableCell>
+                            {typeof evaluacion.fecha === "number"
+                              ? new Date(evaluacion.fecha).toLocaleDateString()
+                              : typeof evaluacion.fecha === "string"
+                                ? evaluacion.fecha
+                                : "Fecha no disponible"}
+                          </TableCell>
+                          <TableCell>{evaluacion.tipo}</TableCell>
+                          <TableCell>{evaluacion.notas}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <div className="p-4 flex justify-end">
+                    <Button onClick={handleAddEvaluacion} className="no-print">
+                      Añadir Evaluación
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </Layout>
   )

@@ -156,7 +156,7 @@ export default function NuevaSesionPage() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/prestaciones">
+            <Link href={pacienteIdParam ? `/pacientes/${pacienteIdParam}` : "/pacientes"}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
@@ -239,9 +239,9 @@ export default function NuevaSesionPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Evaluación">Evaluación</SelectItem>
+                    <SelectItem value="Reevaluación">Reevaluación</SelectItem>
                     <SelectItem value="Tratamiento">Tratamiento</SelectItem>
                     <SelectItem value="Control">Control</SelectItem>
-                    <SelectItem value="Reevaluación">Reevaluación</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

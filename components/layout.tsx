@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, User, Home, Users, Calendar, FileText, LogOut, Heart, LayoutDashboard } from "lucide-react"
+import { Menu, User, Home, Users, Calendar, LogOut, Heart, LayoutDashboard } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 
 interface LayoutProps {
@@ -40,13 +40,12 @@ export function Layout({ children }: LayoutProps) {
     { name: "Inicio", href: "/dashboard", icon: Home },
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Pacientes", href: "/pacientes", icon: Users },
-    { name: "Prestaciones", href: "/prestaciones", icon: FileText },
     { name: "Agenda", href: "/agenda", icon: Calendar },
   ]
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b bg-background">
+      <header className="sticky top-0 z-10 border-b bg-background no-print">
         <div className="container flex h-16 items-center justify-between py-4">
           <div className="flex items-center gap-2">
             <Sheet>
@@ -142,7 +141,7 @@ export function Layout({ children }: LayoutProps) {
       <main className="flex-1 bg-muted/40">
         <div className="container py-6">{children}</div>
       </main>
-      <footer className="border-t bg-background">
+      <footer className="border-t bg-background no-print">
         <div className="container flex flex-col gap-2 py-4 md:flex-row md:items-center md:justify-between">
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
             © 2025 Kinem Chile. Todos los derechos reservados.

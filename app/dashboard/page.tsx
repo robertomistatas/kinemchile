@@ -7,7 +7,7 @@ import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { getPacientes, getSesiones } from "@/lib/firestore"
 import type { Paciente, Sesion } from "@/lib/data"
-import { Users, FileText, Calendar, Clock } from "lucide-react"
+import { Users, Calendar, Clock } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -104,7 +104,7 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Sesiones Totales</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{dataLoading ? "..." : stats.totalSesiones}</div>

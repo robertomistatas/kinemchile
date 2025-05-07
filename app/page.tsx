@@ -25,9 +25,6 @@ export default function Home() {
             <Link href="/pacientes" className="font-medium">
               Pacientes
             </Link>
-            <Link href="/prestaciones" className="font-medium">
-              Prestaciones
-            </Link>
             <Link href="/agenda" className="font-medium">
               Agenda
             </Link>
