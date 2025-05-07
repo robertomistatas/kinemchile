@@ -68,8 +68,39 @@ export default function PacienteDetallePage() {
 
       console.log(`Cargando sesiones para el paciente ${id}`)
       try {
+        // Intentar obtener sesiones usando el ID del paciente
         const sesionesData = await getSesionesPaciente(id)
         console.log(`Sesiones cargadas: ${sesionesData.length}`, sesionesData)
+
+        if (sesionesData.length === 0) {
+          // Si no hay sesiones, verificar si hay un problema con el componente de depuración
+          console.log("No se encontraron sesiones. Verificando con el componente de depuración...")
+          const debugResult = await DebugSesiones({ pacienteId: id })
+          console.log("Resultado de depuración:", debugResult)
+
+          // Buscar sesiones que coincidan con el paciente actual
+          const matchingSesiones = debugResult.filter(
+            (s) =>
+              s.pacienteId === id ||
+              (s.paciente && s.paciente.id === id) ||
+              (s.paciente && s.paciente.rut === pacienteData.rut),
+          )
+
+          if (matchingSesiones.length > 0) {
+            console.log("Se encontraron sesiones en la depuración:", matchingSesiones)
+            // Usar estas sesiones si se encontraron
+            const evaluacionesData = matchingSesiones.filter(
+              (s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación",
+            )
+            const otherSesiones = matchingSesiones.filter((s) => s.tipo !== "Evaluación" && s.tipo !== "Reevaluación")
+
+            setSesiones(otherSesiones)
+            setEvaluaciones(evaluacionesData)
+            setDataLoading(false)
+            setRefreshing(false)
+            return
+          }
+        }
 
         // Separar sesiones y evaluaciones
         const evaluacionesData = sesionesData.filter((s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación")

@@ -49,13 +49,42 @@ export function DebugSesiones({ pacienteId }: { pacienteId?: string }) {
 
         {error && <p className="text-red-500 mt-4">{error}</p>}
 
-        {sesiones.length > 0 && (
+        {sesiones.length > 0 ? (
           <div className="mt-4">
             <p>Total de sesiones: {sesiones.length}</p>
-            <pre className="bg-gray-100 p-4 rounded mt-2 overflow-auto max-h-96">
-              {JSON.stringify(sesiones, null, 2)}
-            </pre>
+            <div className="mt-4 space-y-4">
+              {sesiones.map((sesion) => (
+                <div key={sesion.id} className="border p-4 rounded-md">
+                  <h3 className="font-bold">Sesión ID: {sesion.id}</h3>
+                  <p>
+                    <strong>Tipo:</strong> {sesion.tipo}
+                  </p>
+                  <p>
+                    <strong>Fecha:</strong>{" "}
+                    {typeof sesion.fecha === "number" ? new Date(sesion.fecha).toLocaleString() : String(sesion.fecha)}
+                  </p>
+                  <p>
+                    <strong>Paciente ID:</strong> {sesion.pacienteId}
+                  </p>
+                  {sesion.paciente && (
+                    <div className="mt-2">
+                      <p>
+                        <strong>Paciente:</strong> {sesion.paciente.nombre} {sesion.paciente.apellido}
+                      </p>
+                      <p>
+                        <strong>RUT:</strong> {sesion.paciente.rut}
+                      </p>
+                    </div>
+                  )}
+                  <p className="mt-2">
+                    <strong>Notas:</strong> {sesion.notas}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
+        ) : (
+          <p className="mt-4">No se encontraron sesiones.</p>
         )}
       </CardContent>
     </Card>

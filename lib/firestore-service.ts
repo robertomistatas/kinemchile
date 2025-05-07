@@ -238,15 +238,31 @@ export async function getSesionesPaciente(pacienteId: string): Promise<Sesion[]>
       return []
     }
 
+    // IMPORTANTE: Vamos a probar con ambos formatos de ID para asegurar compatibilidad
     const sesionesRef = collection(firestore, "sesiones")
-    const q = query(sesionesRef, where("pacienteId", "==", pacienteId), orderBy("fecha", "desc"))
 
-    console.log("Ejecutando consulta de sesiones...")
-    const snapshot = await getDocs(q)
-    console.log(`Se encontraron ${snapshot.docs.length} sesiones para el paciente ${pacienteId}`)
+    // Primero intentamos con el ID exacto
+    const q1 = query(sesionesRef, where("pacienteId", "==", pacienteId))
+
+    console.log("Ejecutando consulta de sesiones con ID exacto...")
+    const snapshot1 = await getDocs(q1)
+    console.log(`Se encontraron ${snapshot1.docs.length} sesiones para el paciente con ID exacto ${pacienteId}`)
+
+    // Si no encontramos nada, intentamos buscar en el objeto paciente.id
+    let sesiones = []
+    if (snapshot1.docs.length === 0) {
+      console.log("Intentando buscar por paciente.id...")
+      const q2 = query(sesionesRef, where("paciente.id", "==", pacienteId))
+      const snapshot2 = await getDocs(q2)
+      console.log(`Se encontraron ${snapshot2.docs.length} sesiones para el paciente con paciente.id ${pacienteId}`)
+
+      sesiones = snapshot2.docs
+    } else {
+      sesiones = snapshot1.docs
+    }
 
     // Convertir los documentos a objetos Sesion
-    const sesiones = snapshot.docs.map((doc) => {
+    return sesiones.map((doc) => {
       const data = doc.data()
       console.log(`Datos de sesión ${doc.id}:`, data)
 
@@ -266,8 +282,6 @@ export async function getSesionesPaciente(pacienteId: string): Promise<Sesion[]>
         fecha,
       }
     }) as Sesion[]
-
-    return sesiones
   } catch (error) {
     console.error("Error al obtener sesiones del paciente:", error)
     return []
@@ -287,12 +301,17 @@ export async function crearSesion(sesion: Omit<Sesion, "id" | "createdAt">) {
       fechaTimestamp = new Date(sesion.fecha).getTime()
     }
 
+    // Asegurarse de que el pacienteId sea una cadena
+    const pacienteId = String(sesion.pacienteId)
+
     const sesionData = {
       ...sesion,
       fecha: fechaTimestamp,
+      pacienteId: pacienteId,
       createdAt: serverTimestamp(),
     }
 
+    console.log("Datos finales de la sesión a guardar:", sesionData)
     const docRef = await addDoc(collection(firestore, "sesiones"), sesionData)
     console.log(`Sesión creada con ID: ${docRef.id}`)
     return docRef.id
@@ -346,13 +365,40 @@ export async function debugSesiones() {
 
     const sesiones = snapshot.docs.map((doc) => {
       const data = doc.data()
+
+      // Extraer información relevante para depuración
+      let fechaInfo = "desconocido"
+      if (data.fecha) {
+        if (typeof data.fecha === "number") {
+          fechaInfo = `número: ${data.fecha} (${new Date(data.fecha).toLocaleString()})`
+        } else if (typeof data.fecha === "string") {
+          fechaInfo = `string: ${data.fecha}`
+        } else if (typeof data.fecha === "object") {
+          if (data.fecha.toDate) {
+            fechaInfo = `timestamp: ${data.fecha.toDate().toLocaleString()}`
+          } else if (data.fecha.seconds) {
+            fechaInfo = `firestore timestamp: ${new Date(data.fecha.seconds * 1000).toLocaleString()}`
+          } else {
+            fechaInfo = `objeto: ${JSON.stringify(data.fecha)}`
+          }
+        }
+      }
+
+      // Extraer información del paciente
+      let pacienteInfo = "desconocido"
+      if (data.paciente) {
+        pacienteInfo = `id: ${data.paciente.id || "N/A"}, nombre: ${data.paciente.nombre || "N/A"} ${data.paciente.apellido || "N/A"}, rut: ${data.paciente.rut || "N/A"}`
+      }
+
       return {
         id: doc.id,
         ...data,
-        _fechaType: data.fecha ? typeof data.fecha : "undefined",
-        _fechaValue: data.fecha,
-        _pacienteIdType: data.pacienteId ? typeof data.pacienteId : "undefined",
-        _pacienteIdValue: data.pacienteId,
+        _debug: {
+          fechaInfo,
+          pacienteInfo,
+          pacienteIdTipo: typeof data.pacienteId,
+          tipoSesion: data.tipo || "N/A",
+        },
       }
     })
 
