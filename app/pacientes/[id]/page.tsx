@@ -11,7 +11,7 @@ import { getPaciente, getSesionesPaciente, actualizarPaciente } from "@/lib/fire
 import type { Paciente, Sesion } from "@/lib/data"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle } from "lucide-react"
+import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -34,6 +34,7 @@ export default function PacienteDetallePage() {
   const [sesiones, setSesiones] = useState<Sesion[]>([])
   const [evaluaciones, setEvaluaciones] = useState<Sesion[]>([])
   const [dataLoading, setDataLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState("")
   const [notasAlta, setNotasAlta] = useState("")
   const [showAltaDialog, setShowAltaDialog] = useState(false)
@@ -77,6 +78,7 @@ export default function PacienteDetallePage() {
       setError("No se pudo cargar la información del paciente")
     } finally {
       setDataLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -85,6 +87,11 @@ export default function PacienteDetallePage() {
       fetchData()
     }
   }, [user, id])
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchData()
+  }
 
   const handlePrint = () => {
     window.print()
@@ -203,7 +210,7 @@ export default function PacienteDetallePage() {
     return null
   }
 
-  if (dataLoading) {
+  if (dataLoading && !refreshing) {
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
@@ -250,6 +257,10 @@ export default function PacienteDetallePage() {
             <h1 className="text-3xl font-bold tracking-tight">Ficha del Paciente</h1>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={handleRefresh} className="no-print" disabled={refreshing}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Actualizando..." : "Actualizar"}
+            </Button>
             <Button variant="outline" onClick={handlePrint} className="no-print">
               <Printer className="mr-2 h-4 w-4" />
               Imprimir

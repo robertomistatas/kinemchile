@@ -15,6 +15,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  deleteField,
 } from "firebase/firestore"
 
 // Firebase configuration
@@ -93,6 +94,7 @@ export {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  deleteField,
 }
 
 // Funciones para obtener instancias de Firebase

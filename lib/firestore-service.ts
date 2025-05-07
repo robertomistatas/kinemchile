@@ -13,6 +13,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  deleteField,
 } from "@/lib/firebase"
 import type { Paciente, Sesion } from "./data"
 
@@ -120,6 +121,11 @@ export async function actualizarPaciente(id: string, paciente: Partial<Omit<Paci
 
     // Convertir valores null a deleteField() para eliminar el campo
     const updateData = { ...paciente }
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] === null) {
+        updateData[key] = deleteField()
+      }
+    })
 
     await updateDoc(docRef, updateData)
     console.log("Paciente actualizado correctamente")
