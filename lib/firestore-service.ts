@@ -213,10 +213,22 @@ export async function getSesionesPaciente(pacienteId: string): Promise<Sesion[]>
     const q = query(sesionesRef, where("pacienteId", "==", pacienteId), orderBy("fecha", "desc"))
     const snapshot = await getDocs(q)
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Sesion[]
+    console.log(`Se encontraron ${snapshot.docs.length} sesiones para el paciente ${pacienteId}`)
+
+    // Convertir los documentos a objetos Sesion
+    const sesiones = snapshot.docs.map((doc) => {
+      const data = doc.data()
+      // Asegurarse de que la fecha sea un número o string
+      const fecha = typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha
+
+      return {
+        id: doc.id,
+        ...data,
+        fecha,
+      }
+    }) as Sesion[]
+
+    return sesiones
   } catch (error) {
     console.error("Error al obtener sesiones del paciente:", error)
     return []
