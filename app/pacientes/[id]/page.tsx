@@ -26,6 +26,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { jsPDF } from "jspdf"
 import "jspdf-autotable"
 
+// Importar el componente de depuración
+import { DebugSesiones } from "@/components/debug-sesiones"
+
 export default function PacienteDetallePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -64,15 +67,23 @@ export default function PacienteDetallePage() {
       setPaciente(pacienteData)
 
       console.log(`Cargando sesiones para el paciente ${id}`)
-      const sesionesData = await getSesionesPaciente(id)
-      console.log(`Sesiones cargadas: ${sesionesData.length}`)
+      try {
+        const sesionesData = await getSesionesPaciente(id)
+        console.log(`Sesiones cargadas: ${sesionesData.length}`, sesionesData)
 
-      // Separar sesiones y evaluaciones
-      const evaluacionesData = sesionesData.filter((s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación")
-      const otherSesiones = sesionesData.filter((s) => s.tipo !== "Evaluación" && s.tipo !== "Reevaluación")
+        // Separar sesiones y evaluaciones
+        const evaluacionesData = sesionesData.filter((s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación")
+        const otherSesiones = sesionesData.filter((s) => s.tipo !== "Evaluación" && s.tipo !== "Reevaluación")
 
-      setSesiones(otherSesiones)
-      setEvaluaciones(evaluacionesData)
+        console.log(`Sesiones filtradas: ${otherSesiones.length}`, otherSesiones)
+        console.log(`Evaluaciones filtradas: ${evaluacionesData.length}`, evaluacionesData)
+
+        setSesiones(otherSesiones)
+        setEvaluaciones(evaluacionesData)
+      } catch (sesionesError) {
+        console.error("Error al cargar sesiones:", sesionesError)
+        setError("Error al cargar las sesiones del paciente")
+      }
     } catch (error) {
       console.error("Error al cargar datos:", error)
       setError("No se pudo cargar la información del paciente")
@@ -557,6 +568,10 @@ export default function PacienteDetallePage() {
               )}
             </TabsContent>
           </Tabs>
+        </div>
+        {/* Añadir el componente al final del JSX, justo antes del cierre del div principal */}
+        <div className="no-print mt-8">
+          <DebugSesiones pacienteId={id} />
         </div>
       </div>
     </Layout>

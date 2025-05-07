@@ -61,8 +61,8 @@
     "jspdf": "latest",
     "@supabase/supabase-js": "latest",
     "resend": "latest",
-    "jspdf-autotable": "latest",
-    "firebase": "latest"
+    "firebase": "latest",
+    "jspdf-autotable": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

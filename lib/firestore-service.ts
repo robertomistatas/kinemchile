@@ -231,17 +231,34 @@ export async function getSesionesPaciente(pacienteId: string): Promise<Sesion[]>
 
   try {
     console.log(`Obteniendo sesiones del paciente con ID: ${pacienteId}`)
+
+    // Verificar que el ID del paciente sea válido
+    if (!pacienteId || pacienteId.trim() === "") {
+      console.error("ID de paciente inválido")
+      return []
+    }
+
     const sesionesRef = collection(firestore, "sesiones")
     const q = query(sesionesRef, where("pacienteId", "==", pacienteId), orderBy("fecha", "desc"))
-    const snapshot = await getDocs(q)
 
+    console.log("Ejecutando consulta de sesiones...")
+    const snapshot = await getDocs(q)
     console.log(`Se encontraron ${snapshot.docs.length} sesiones para el paciente ${pacienteId}`)
 
     // Convertir los documentos a objetos Sesion
     const sesiones = snapshot.docs.map((doc) => {
       const data = doc.data()
+      console.log(`Datos de sesión ${doc.id}:`, data)
+
       // Asegurarse de que la fecha sea un número o string
-      const fecha = typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha
+      let fecha = data.fecha
+      if (typeof data.fecha === "object" && data.fecha !== null) {
+        if (data.fecha.toDate) {
+          fecha = data.fecha.toDate().getTime()
+        } else if (data.fecha.seconds) {
+          fecha = data.fecha.seconds * 1000
+        }
+      }
 
       return {
         id: doc.id,
@@ -262,9 +279,17 @@ export async function crearSesion(sesion: Omit<Sesion, "id" | "createdAt">) {
   if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
-    console.log("Creando nueva sesión...")
+    console.log("Creando nueva sesión con datos:", JSON.stringify(sesion))
+
+    // Asegurarse de que la fecha sea un timestamp
+    let fechaTimestamp = sesion.fecha
+    if (typeof sesion.fecha === "string") {
+      fechaTimestamp = new Date(sesion.fecha).getTime()
+    }
+
     const sesionData = {
       ...sesion,
+      fecha: fechaTimestamp,
       createdAt: serverTimestamp(),
     }
 
@@ -304,5 +329,37 @@ export async function eliminarSesion(id: string) {
   } catch (error) {
     console.error("Error al eliminar sesión:", error)
     throw error
+  }
+}
+
+// Función de depuración para verificar la estructura de la colección de sesiones
+export async function debugSesiones() {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log("Depurando colección de sesiones...")
+    const sesionesRef = collection(firestore, "sesiones")
+    const snapshot = await getDocs(sesionesRef)
+
+    console.log(`Total de sesiones en la colección: ${snapshot.docs.length}`)
+
+    const sesiones = snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        _fechaType: data.fecha ? typeof data.fecha : "undefined",
+        _fechaValue: data.fecha,
+        _pacienteIdType: data.pacienteId ? typeof data.pacienteId : "undefined",
+        _pacienteIdValue: data.pacienteId,
+      }
+    })
+
+    console.log("Estructura de sesiones:", sesiones)
+    return sesiones
+  } catch (error) {
+    console.error("Error al depurar sesiones:", error)
+    return []
   }
 }

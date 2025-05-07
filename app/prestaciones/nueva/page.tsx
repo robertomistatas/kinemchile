@@ -119,8 +119,12 @@ export default function NuevaSesionPage() {
     }
 
     try {
+      // Convertir la fecha a timestamp
+      const fechaTimestamp = new Date(formData.fecha).getTime()
+      console.log("Fecha convertida a timestamp:", fechaTimestamp)
+
       const sesionData = {
-        fecha: new Date(formData.fecha).getTime(),
+        fecha: fechaTimestamp,
         pacienteId: selectedPacienteId,
         paciente: {
           id: selectedPacienteId,
@@ -132,7 +136,11 @@ export default function NuevaSesionPage() {
         notas: formData.notas,
       }
 
-      await crearSesion(sesionData)
+      console.log("Enviando datos de sesión:", sesionData)
+
+      const sesionId = await crearSesion(sesionData)
+      console.log("Sesión creada con ID:", sesionId)
+
       setSuccess(true)
 
       // Esperar 2 segundos antes de redirigir
