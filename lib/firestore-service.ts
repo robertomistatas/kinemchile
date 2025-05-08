@@ -94,6 +94,7 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
 
     if (docSnap.exists()) {
       const data = docSnap.data()
+      console.log("Datos del paciente:", data)
 
       // Asegurarse de que todos los campos requeridos existan
       const paciente: Paciente = {
@@ -106,11 +107,24 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         fechaNacimiento: data.fechaNacimiento || "",
         direccion: data.direccion || "",
         diagnostico: data.diagnostico || data.diagnosticoMedico || "",
-        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        diagnosticoMedico: data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || "",
+        antecedentesClinicosRelevantes: data.antecedentesClinicosRelevantes || "",
+        evaluacionInicial: data.evaluacionInicial || "",
+        evaluacionFinal: data.evaluacionFinal || "",
+        examenesAuxiliares: data.examenesAuxiliares || "",
+        fechaInicio: data.fechaInicio || "",
+        fechaAlta: data.fechaAlta || "",
+        notasAlta: data.notasAlta || "",
+        edad: data.edad || "",
+        genero: data.genero || "",
+        prevision: data.prevision || "",
+        oda: data.oda || "",
+        patologias: data.patologias || [],
+        sesiones: data.sesiones || [],
         activo: typeof data.activo === "boolean" ? data.activo : true,
         createdAt: data.createdAt || Date.now(),
-        fechaAlta: data.fechaAlta || null,
-        notasAlta: data.notasAlta || null,
+        updatedAt: data.updatedAt || null,
       }
 
       return paciente
@@ -142,11 +156,24 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
           fechaNacimiento: data.fechaNacimiento || "",
           direccion: data.direccion || "",
           diagnostico: data.diagnostico || data.diagnosticoMedico || "",
-          antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+          diagnosticoMedico: data.diagnosticoMedico || "",
+          antecedentesPersonales: data.antecedentesPersonales || "",
+          antecedentesClinicosRelevantes: data.antecedentesClinicosRelevantes || "",
+          evaluacionInicial: data.evaluacionInicial || "",
+          evaluacionFinal: data.evaluacionFinal || "",
+          examenesAuxiliares: data.examenesAuxiliares || "",
+          fechaInicio: data.fechaInicio || "",
+          fechaAlta: data.fechaAlta || "",
+          notasAlta: data.notasAlta || "",
+          edad: data.edad || "",
+          genero: data.genero || "",
+          prevision: data.prevision || "",
+          oda: data.oda || "",
+          patologias: data.patologias || [],
+          sesiones: data.sesiones || [],
           activo: typeof data.activo === "boolean" ? data.activo : true,
           createdAt: data.createdAt || Date.now(),
-          fechaAlta: data.fechaAlta || null,
-          notasAlta: data.notasAlta || null,
+          updatedAt: data.updatedAt || null,
         }
       }
     }
@@ -172,11 +199,24 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         fechaNacimiento: data.fechaNacimiento || "",
         direccion: data.direccion || "",
         diagnostico: data.diagnostico || data.diagnosticoMedico || "",
-        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        diagnosticoMedico: data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || "",
+        antecedentesClinicosRelevantes: data.antecedentesClinicosRelevantes || "",
+        evaluacionInicial: data.evaluacionInicial || "",
+        evaluacionFinal: data.evaluacionFinal || "",
+        examenesAuxiliares: data.examenesAuxiliares || "",
+        fechaInicio: data.fechaInicio || "",
+        fechaAlta: data.fechaAlta || "",
+        notasAlta: data.notasAlta || "",
+        edad: data.edad || "",
+        genero: data.genero || "",
+        prevision: data.prevision || "",
+        oda: data.oda || "",
+        patologias: data.patologias || [],
+        sesiones: data.sesiones || [],
         activo: typeof data.activo === "boolean" ? data.activo : true,
         createdAt: data.createdAt || Date.now(),
-        fechaAlta: data.fechaAlta || null,
-        notasAlta: data.notasAlta || null,
+        updatedAt: data.updatedAt || null,
       }
     }
 

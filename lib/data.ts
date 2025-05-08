@@ -9,11 +9,27 @@ export interface Paciente {
   fechaNacimiento: string
   direccion?: string
   diagnostico?: string
+  diagnosticoMedico?: string
   antecedentesPersonales?: string
-  activo: boolean
+  antecedentesClinicosRelevantes?: string
+  evaluacionInicial?: string
+  evaluacionFinal?: string
+  examenesAuxiliares?: string
+  fechaInicio?: string
   fechaAlta?: string
   notasAlta?: string
+  edad?: string
+  genero?: string
+  prevision?: string
+  oda?: string
+  patologias?: string[]
+  sesiones?: Array<{
+    fecha: string
+    observaciones: string
+  }>
+  activo: boolean
   createdAt: number
+  updatedAt?: number
 }
 
 export interface Sesion {

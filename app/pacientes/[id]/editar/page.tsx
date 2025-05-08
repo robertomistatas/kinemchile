@@ -17,6 +17,7 @@ import { getPaciente, actualizarPaciente } from "@/lib/firestore"
 import Link from "next/link"
 import { validarRut, formatearRut } from "@/lib/utils"
 import type { Paciente } from "@/lib/data"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function EditarPacientePage() {
   const { user, loading } = useAuth()
@@ -31,7 +32,16 @@ export default function EditarPacientePage() {
     fechaNacimiento: "",
     direccion: "",
     diagnostico: "",
+    diagnosticoMedico: "",
     antecedentesPersonales: "",
+    antecedentesClinicosRelevantes: "",
+    evaluacionInicial: "",
+    evaluacionFinal: "",
+    examenesAuxiliares: "",
+    fechaInicio: "",
+    edad: "",
+    genero: "",
+    prevision: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -59,7 +69,16 @@ export default function EditarPacientePage() {
             fechaNacimiento: pacienteData.fechaNacimiento || "",
             direccion: pacienteData.direccion || "",
             diagnostico: pacienteData.diagnostico || "",
+            diagnosticoMedico: pacienteData.diagnosticoMedico || "",
             antecedentesPersonales: pacienteData.antecedentesPersonales || "",
+            antecedentesClinicosRelevantes: pacienteData.antecedentesClinicosRelevantes || "",
+            evaluacionInicial: pacienteData.evaluacionInicial || "",
+            evaluacionFinal: pacienteData.evaluacionFinal || "",
+            examenesAuxiliares: pacienteData.examenesAuxiliares || "",
+            fechaInicio: pacienteData.fechaInicio || "",
+            edad: pacienteData.edad || "",
+            genero: pacienteData.genero || "",
+            prevision: pacienteData.prevision || "",
           })
         } else {
           setGeneralError("No se encontró el paciente")
@@ -86,6 +105,15 @@ export default function EditarPacientePage() {
     } else {
       setFormData({ ...formData, [name]: value })
     }
+
+    // Limpiar error del campo
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: "" })
+    }
+  }
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value })
 
     // Limpiar error del campo
     if (errors[name]) {
@@ -138,7 +166,17 @@ export default function EditarPacientePage() {
         fechaNacimiento: formData.fechaNacimiento,
         direccion: formData.direccion,
         diagnostico: formData.diagnostico,
+        diagnosticoMedico: formData.diagnosticoMedico,
         antecedentesPersonales: formData.antecedentesPersonales,
+        antecedentesClinicosRelevantes: formData.antecedentesClinicosRelevantes,
+        evaluacionInicial: formData.evaluacionInicial,
+        evaluacionFinal: formData.evaluacionFinal,
+        examenesAuxiliares: formData.examenesAuxiliares,
+        fechaInicio: formData.fechaInicio,
+        edad: formData.edad,
+        genero: formData.genero,
+        prevision: formData.prevision,
+        updatedAt: Date.now(),
       })
 
       router.push(`/pacientes/${id}`)
@@ -239,6 +277,29 @@ export default function EditarPacientePage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="edad">Edad</Label>
+                    <Input
+                      id="edad"
+                      name="edad"
+                      value={formData.edad}
+                      onChange={handleChange}
+                      placeholder="Edad del paciente"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="genero">Género</Label>
+                    <Select value={formData.genero} onValueChange={(value) => handleSelectChange("genero", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un género" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -259,6 +320,23 @@ export default function EditarPacientePage() {
                       onChange={handleChange}
                       placeholder="+56 9 1234 5678"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="prevision">Previsión</Label>
+                    <Select
+                      value={formData.prevision}
+                      onValueChange={(value) => handleSelectChange("prevision", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una previsión" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fonasa">Fonasa</SelectItem>
+                        <SelectItem value="isapre">Isapre</SelectItem>
+                        <SelectItem value="particular">Particular</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="direccion">Dirección</Label>
@@ -281,25 +359,77 @@ export default function EditarPacientePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="diagnostico">Diagnóstico</Label>
+                  <Label htmlFor="diagnosticoMedico">Diagnóstico Médico</Label>
                   <Textarea
-                    id="diagnostico"
-                    name="diagnostico"
-                    value={formData.diagnostico}
+                    id="diagnosticoMedico"
+                    name="diagnosticoMedico"
+                    value={formData.diagnosticoMedico}
                     onChange={handleChange}
-                    placeholder="Diagnóstico del paciente"
+                    placeholder="Diagnóstico médico del paciente"
                     rows={3}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="antecedentesPersonales">Antecedentes Personales</Label>
+                  <Label htmlFor="antecedentesClinicosRelevantes">Antecedentes Clínicos Relevantes</Label>
                   <Textarea
-                    id="antecedentesPersonales"
-                    name="antecedentesPersonales"
-                    value={formData.antecedentesPersonales}
+                    id="antecedentesClinicosRelevantes"
+                    name="antecedentesClinicosRelevantes"
+                    value={formData.antecedentesClinicosRelevantes}
                     onChange={handleChange}
-                    placeholder="Antecedentes personales del paciente"
+                    placeholder="Antecedentes clínicos relevantes del paciente"
                     rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="examenesAuxiliares">Exámenes Auxiliares</Label>
+                  <Textarea
+                    id="examenesAuxiliares"
+                    name="examenesAuxiliares"
+                    value={formData.examenesAuxiliares}
+                    onChange={handleChange}
+                    placeholder="Exámenes auxiliares del paciente"
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fechaInicio">Fecha de Inicio</Label>
+                  <Input
+                    id="fechaInicio"
+                    name="fechaInicio"
+                    type="date"
+                    value={formData.fechaInicio}
+                    onChange={handleChange}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Evaluaciones</CardTitle>
+                <CardDescription>Edita las evaluaciones del paciente</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="evaluacionInicial">Evaluación Inicial</Label>
+                  <Textarea
+                    id="evaluacionInicial"
+                    name="evaluacionInicial"
+                    value={formData.evaluacionInicial}
+                    onChange={handleChange}
+                    placeholder="Evaluación inicial del paciente"
+                    rows={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="evaluacionFinal">Evaluación Final</Label>
+                  <Textarea
+                    id="evaluacionFinal"
+                    name="evaluacionFinal"
+                    value={formData.evaluacionFinal}
+                    onChange={handleChange}
+                    placeholder="Evaluación final del paciente"
+                    rows={5}
                   />
                 </div>
               </CardContent>
