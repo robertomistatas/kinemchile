@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
-import { getPacientesActivos, getPaciente } from "@/lib/firestore"
+import { getPacientesActivos, getPaciente, crearPaciente } from "@/lib/firestore"
 import type { Paciente } from "@/lib/data"
 import {
   Dialog,
@@ -22,10 +22,12 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Clock, AlertCircle, CheckCircle } from "lucide-react"
+import { Plus, Edit, Trash2, Clock, AlertCircle, CheckCircle, UserPlus } from "lucide-react"
 import { PacienteCombobox } from "@/components/paciente-combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { formatearRut, validarRut } from "@/lib/utils"
 
 // Tipo para las citas
 interface Cita {
@@ -58,6 +60,15 @@ export default function AgendaPage() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null)
+  const [activeTab, setActiveTab] = useState("paciente-existente")
+  const [nuevoPaciente, setNuevoPaciente] = useState({
+    nombre: "",
+    apellido: "",
+    rut: "",
+    telefono: "",
+    prevision: "",
+  })
+  const [nuevoPacienteErrors, setNuevoPacienteErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!loading && !user) {
@@ -70,6 +81,7 @@ export default function AgendaPage() {
       try {
         setDataLoading(true)
         const data = await getPacientesActivos()
+        console.log("Pacientes cargados:", data.length)
         setPacientes(data)
       } catch (error) {
         console.error("Error al cargar pacientes:", error)
@@ -140,13 +152,107 @@ export default function AgendaPage() {
     setFormData({ ...formData, [name]: value })
   }
 
+  const handleNuevoPacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+
+    if (name === "rut") {
+      setNuevoPaciente({ ...nuevoPaciente, [name]: formatearRut(value) })
+    } else {
+      setNuevoPaciente({ ...nuevoPaciente, [name]: value })
+    }
+
+    // Limpiar error del campo
+    if (nuevoPacienteErrors[name]) {
+      setNuevoPacienteErrors({ ...nuevoPacienteErrors, [name]: "" })
+    }
+  }
+
   const handleSelectChange = (name: string, value: string) => {
-    setFormData({ ...formData, [name]: value })
+    if (activeTab === "paciente-existente") {
+      setFormData({ ...formData, [name]: value })
+    } else {
+      setNuevoPaciente({ ...nuevoPaciente, [name]: value })
+    }
   }
 
   const handleDateChange = (newDate: Date | undefined) => {
     if (newDate) {
       setFormData({ ...formData, fecha: newDate })
+    }
+  }
+
+  const validateNuevoPaciente = () => {
+    const errors: Record<string, string> = {}
+
+    if (!nuevoPaciente.nombre.trim()) {
+      errors.nombre = "El nombre es obligatorio"
+    }
+
+    if (!nuevoPaciente.apellido.trim()) {
+      errors.apellido = "El apellido es obligatorio"
+    }
+
+    if (!nuevoPaciente.rut.trim()) {
+      errors.rut = "El RUT es obligatorio"
+    } else if (!validarRut(nuevoPaciente.rut)) {
+      errors.rut = "El RUT ingresado no es válido"
+    }
+
+    setNuevoPacienteErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleCrearPacienteRapido = async () => {
+    if (!validateNuevoPaciente()) {
+      return
+    }
+
+    setSubmitting(true)
+    setError("")
+
+    try {
+      // Crear paciente básico
+      const pacienteId = await crearPaciente({
+        nombre: nuevoPaciente.nombre,
+        apellido: nuevoPaciente.apellido,
+        rut: nuevoPaciente.rut,
+        telefono: nuevoPaciente.telefono,
+        prevision: nuevoPaciente.prevision,
+        email: "",
+        fechaNacimiento: "",
+      })
+
+      // Obtener el paciente recién creado
+      const pacienteCreado = await getPaciente(pacienteId)
+
+      // Actualizar la lista de pacientes
+      setPacientes([...pacientes, pacienteCreado])
+
+      // Seleccionar el paciente recién creado
+      setFormData({
+        ...formData,
+        pacienteId: pacienteId,
+        prevision: nuevoPaciente.prevision,
+      })
+
+      setSelectedPaciente(pacienteCreado)
+
+      // Cambiar a la pestaña de paciente existente
+      setActiveTab("paciente-existente")
+
+      // Limpiar el formulario de nuevo paciente
+      setNuevoPaciente({
+        nombre: "",
+        apellido: "",
+        rut: "",
+        telefono: "",
+        prevision: "",
+      })
+    } catch (error) {
+      console.error("Error al crear paciente rápido:", error)
+      setError("Error al crear el paciente. Por favor, intenta nuevamente.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -156,13 +262,18 @@ export default function AgendaPage() {
     setError("")
     setSuccess(false)
 
-    if (!formData.pacienteId || !selectedPaciente) {
-      setError("Debes seleccionar un paciente")
-      setSubmitting(false)
-      return
-    }
-
     try {
+      if (activeTab === "paciente-nuevo") {
+        handleCrearPacienteRapido()
+        return
+      }
+
+      if (!formData.pacienteId || !selectedPaciente) {
+        setError("Debes seleccionar un paciente")
+        setSubmitting(false)
+        return
+      }
+
       const nuevaCita: Cita = {
         id: citaEnEdicion ? citaEnEdicion.id : Date.now().toString(),
         fecha: formData.fecha,
@@ -204,6 +315,7 @@ export default function AgendaPage() {
       motivo: cita.motivo,
       prevision: cita.prevision || "",
     })
+    setActiveTab("paciente-existente")
     setShowNuevaCita(true)
   }
 
@@ -219,11 +331,20 @@ export default function AgendaPage() {
       motivo: "",
       prevision: "",
     })
+    setNuevoPaciente({
+      nombre: "",
+      apellido: "",
+      rut: "",
+      telefono: "",
+      prevision: "",
+    })
     setSelectedPaciente(null)
     setCitaEnEdicion(null)
     setShowNuevaCita(false)
     setSuccess(false)
     setError("")
+    setActiveTab("paciente-existente")
+    setNuevoPacienteErrors({})
   }
 
   // Filtrar citas por fecha seleccionada
@@ -311,7 +432,7 @@ export default function AgendaPage() {
 
         {/* Diálogo para nueva cita */}
         <Dialog open={showNuevaCita} onOpenChange={setShowNuevaCita}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="sm:max-w-[600px] rounded-lg">
             <DialogHeader>
               <DialogTitle>{citaEnEdicion ? "Editar Cita" : "Nueva Cita"}</DialogTitle>
               <DialogDescription>
@@ -337,107 +458,216 @@ export default function AgendaPage() {
               </Alert>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="paciente">Paciente</Label>
-                  <PacienteCombobox
-                    pacientes={pacientes}
-                    selectedPacienteId={formData.pacienteId}
-                    onSelect={(value) => handleSelectChange("pacienteId", value)}
-                    disabled={dataLoading || submitting || success}
-                    placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
-                  />
-                </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="paciente-existente">Paciente existente</TabsTrigger>
+                <TabsTrigger value="paciente-nuevo">Paciente nuevo</TabsTrigger>
+              </TabsList>
 
-                {selectedPaciente && (
-                  <div className="p-3 bg-muted rounded-md text-sm">
-                    <p>
-                      <strong>Paciente:</strong> {selectedPaciente.nombre} {selectedPaciente.apellido}
-                    </p>
-                    <p>
-                      <strong>RUT:</strong> {selectedPaciente.rut}
-                    </p>
-                    {selectedPaciente.telefono && (
-                      <p>
-                        <strong>Teléfono:</strong> {selectedPaciente.telefono}
-                      </p>
-                    )}
-                    {selectedPaciente.prevision && (
-                      <p>
-                        <strong>Previsión:</strong> {selectedPaciente.prevision}
-                      </p>
-                    )}
-                  </div>
-                )}
+              <form onSubmit={handleSubmit}>
+                <div className="py-4">
+                  <TabsContent value="paciente-existente" className="mt-0">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="paciente">Paciente</Label>
+                        <PacienteCombobox
+                          pacientes={pacientes}
+                          selectedPacienteId={formData.pacienteId}
+                          onSelect={(value) => handleSelectChange("pacienteId", value)}
+                          onCreateNew={() => setActiveTab("paciente-nuevo")}
+                          disabled={dataLoading || submitting || success}
+                          placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
+                        />
+                      </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fecha">Fecha</Label>
-                    <div className="rounded-md border">
-                      <Calendar
-                        mode="single"
-                        selected={formData.fecha}
-                        onSelect={handleDateChange}
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        initialFocus
+                      {selectedPaciente && (
+                        <div className="p-3 bg-muted rounded-md text-sm">
+                          <p>
+                            <strong>Paciente:</strong> {selectedPaciente.nombre} {selectedPaciente.apellido}
+                          </p>
+                          <p>
+                            <strong>RUT:</strong> {selectedPaciente.rut}
+                          </p>
+                          {selectedPaciente.telefono && (
+                            <p>
+                              <strong>Teléfono:</strong> {selectedPaciente.telefono}
+                            </p>
+                          )}
+                          {selectedPaciente.prevision && (
+                            <p>
+                              <strong>Previsión:</strong> {selectedPaciente.prevision}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="paciente-nuevo" className="mt-0">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="nombre">Nombre</Label>
+                          <Input
+                            id="nombre"
+                            name="nombre"
+                            value={nuevoPaciente.nombre}
+                            onChange={handleNuevoPacienteChange}
+                            placeholder="Nombre del paciente"
+                            disabled={submitting || success}
+                          />
+                          {nuevoPacienteErrors.nombre && (
+                            <p className="text-sm text-red-500">{nuevoPacienteErrors.nombre}</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="apellido">Apellido</Label>
+                          <Input
+                            id="apellido"
+                            name="apellido"
+                            value={nuevoPaciente.apellido}
+                            onChange={handleNuevoPacienteChange}
+                            placeholder="Apellido del paciente"
+                            disabled={submitting || success}
+                          />
+                          {nuevoPacienteErrors.apellido && (
+                            <p className="text-sm text-red-500">{nuevoPacienteErrors.apellido}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="rut">RUT</Label>
+                          <Input
+                            id="rut"
+                            name="rut"
+                            value={nuevoPaciente.rut}
+                            onChange={handleNuevoPacienteChange}
+                            placeholder="12.345.678-9"
+                            disabled={submitting || success}
+                          />
+                          {nuevoPacienteErrors.rut && <p className="text-sm text-red-500">{nuevoPacienteErrors.rut}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="telefono">Teléfono</Label>
+                          <Input
+                            id="telefono"
+                            name="telefono"
+                            value={nuevoPaciente.telefono}
+                            onChange={handleNuevoPacienteChange}
+                            placeholder="+56 9 1234 5678"
+                            disabled={submitting || success}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="prevision-nuevo">Previsión</Label>
+                        <Select
+                          value={nuevoPaciente.prevision}
+                          onValueChange={(value) => handleSelectChange("prevision", value)}
+                          disabled={submitting || success}
+                        >
+                          <SelectTrigger id="prevision-nuevo">
+                            <SelectValue placeholder="Selecciona previsión" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Particular">Particular</SelectItem>
+                            <SelectItem value="Fonasa">Fonasa</SelectItem>
+                            <SelectItem value="Isapre">Isapre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="pt-2">
+                        <Button
+                          type="button"
+                          onClick={handleCrearPacienteRapido}
+                          className="w-full"
+                          disabled={submitting || success}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Crear paciente y continuar
+                        </Button>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <div className="space-y-4 mt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fecha">Fecha</Label>
+                        <div className="rounded-md border">
+                          <Calendar
+                            mode="single"
+                            selected={formData.fecha}
+                            onSelect={handleDateChange}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                            initialFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="hora">Hora</Label>
+                        <Input
+                          id="hora"
+                          name="hora"
+                          type="time"
+                          value={formData.hora}
+                          onChange={handleInputChange}
+                          required
+                          disabled={submitting || success}
+                          className="mb-4"
+                        />
+
+                        <Label htmlFor="prevision" className="mt-4">
+                          Previsión
+                        </Label>
+                        <Select
+                          value={formData.prevision}
+                          onValueChange={(value) => handleSelectChange("prevision", value)}
+                          disabled={submitting || success}
+                        >
+                          <SelectTrigger id="prevision">
+                            <SelectValue placeholder="Selecciona previsión" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Particular">Particular</SelectItem>
+                            <SelectItem value="Fonasa">Fonasa</SelectItem>
+                            <SelectItem value="Isapre">Isapre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="motivo">Motivo</Label>
+                      <Textarea
+                        id="motivo"
+                        name="motivo"
+                        value={formData.motivo}
+                        onChange={handleInputChange}
+                        placeholder="Motivo de la cita"
+                        rows={3}
+                        disabled={submitting || success}
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="hora">Hora</Label>
-                    <Input
-                      id="hora"
-                      name="hora"
-                      type="time"
-                      value={formData.hora}
-                      onChange={handleInputChange}
-                      required
-                      disabled={submitting || success}
-                    />
-
-                    <Label htmlFor="prevision" className="mt-4">
-                      Previsión
-                    </Label>
-                    <Select
-                      value={formData.prevision}
-                      onValueChange={(value) => handleSelectChange("prevision", value)}
-                      disabled={submitting || success}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona previsión" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Particular">Particular</SelectItem>
-                        <SelectItem value="Fonasa">Fonasa</SelectItem>
-                        <SelectItem value="Isapre">Isapre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="motivo">Motivo</Label>
-                  <Textarea
-                    id="motivo"
-                    name="motivo"
-                    value={formData.motivo}
-                    onChange={handleInputChange}
-                    placeholder="Motivo de la cita"
-                    rows={3}
-                    disabled={submitting || success}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting || success}>
-                  {submitting ? "Guardando..." : citaEnEdicion ? "Guardar cambios" : "Agendar cita"}
-                </Button>
-              </DialogFooter>
-            </form>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={submitting || success || (activeTab === "paciente-existente" && !formData.pacienteId)}
+                  >
+                    {submitting ? "Guardando..." : citaEnEdicion ? "Guardar cambios" : "Agendar cita"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
