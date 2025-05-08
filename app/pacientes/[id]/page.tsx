@@ -28,6 +28,7 @@ import "jspdf-autotable"
 
 // Importar el componente de depuración
 import { DebugSesiones } from "@/components/debug-sesiones"
+import { DebugPaciente } from "@/components/debug-paciente"
 
 export default function PacienteDetallePage() {
   const { user, loading } = useAuth()
@@ -59,11 +60,13 @@ export default function PacienteDetallePage() {
       const pacienteData = await getPaciente(id)
 
       if (!pacienteData) {
-        setError("No se encontró el paciente")
+        console.error(`No se encontró el paciente con ID: ${id}`)
+        setError(`No se encontró el paciente con ID: ${id}. Por favor, verifica que el ID sea correcto.`)
         setDataLoading(false)
         return
       }
 
+      console.log("Paciente encontrado:", pacienteData)
       setPaciente(pacienteData)
 
       console.log(`Cargando sesiones para el paciente ${id}`)
@@ -71,36 +74,6 @@ export default function PacienteDetallePage() {
         // Intentar obtener sesiones usando el ID del paciente
         const sesionesData = await getSesionesPaciente(id)
         console.log(`Sesiones cargadas: ${sesionesData.length}`, sesionesData)
-
-        if (sesionesData.length === 0) {
-          // Si no hay sesiones, verificar si hay un problema con el componente de depuración
-          console.log("No se encontraron sesiones. Verificando con el componente de depuración...")
-          const debugResult = await DebugSesiones({ pacienteId: id })
-          console.log("Resultado de depuración:", debugResult)
-
-          // Buscar sesiones que coincidan con el paciente actual
-          const matchingSesiones = debugResult.filter(
-            (s) =>
-              s.pacienteId === id ||
-              (s.paciente && s.paciente.id === id) ||
-              (s.paciente && s.paciente.rut === pacienteData.rut),
-          )
-
-          if (matchingSesiones.length > 0) {
-            console.log("Se encontraron sesiones en la depuración:", matchingSesiones)
-            // Usar estas sesiones si se encontraron
-            const evaluacionesData = matchingSesiones.filter(
-              (s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación",
-            )
-            const otherSesiones = matchingSesiones.filter((s) => s.tipo !== "Evaluación" && s.tipo !== "Reevaluación")
-
-            setSesiones(otherSesiones)
-            setEvaluaciones(evaluacionesData)
-            setDataLoading(false)
-            setRefreshing(false)
-            return
-          }
-        }
 
         // Separar sesiones y evaluaciones
         const evaluacionesData = sesionesData.filter((s) => s.tipo === "Evaluación" || s.tipo === "Reevaluación")
@@ -117,7 +90,7 @@ export default function PacienteDetallePage() {
       }
     } catch (error) {
       console.error("Error al cargar datos:", error)
-      setError("No se pudo cargar la información del paciente")
+      setError(`No se pudo cargar la información del paciente: ${error.message || "Error desconocido"}`)
     } finally {
       setDataLoading(false)
       setRefreshing(false)
@@ -276,11 +249,18 @@ export default function PacienteDetallePage() {
           </div>
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>El paciente que estás buscando no existe o no se pudo cargar.</AlertDescription>
+            <AlertDescription>
+              {error || "El paciente que estás buscando no existe o no se pudo cargar."}
+            </AlertDescription>
           </Alert>
           <Button asChild className="no-print">
             <Link href="/pacientes">Volver a la lista de pacientes</Link>
           </Button>
+
+          {/* Añadir componente de depuración */}
+          <div className="mt-8">
+            <DebugPaciente pacienteId={id} />
+          </div>
         </div>
       </Layout>
     )

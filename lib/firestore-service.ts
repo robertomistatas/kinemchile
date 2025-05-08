@@ -34,13 +34,29 @@ export async function getPacientes(): Promise<Paciente[]> {
   try {
     console.log("Obteniendo pacientes...")
     const pacientesRef = collection(firestore, "pacientes")
-    const q = query(pacientesRef, orderBy("createdAt", "desc"))
-    const snapshot = await getDocs(q)
+    const snapshot = await getDocs(pacientesRef)
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Paciente[]
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+
+      // Asegurarse de que todos los campos requeridos existan
+      return {
+        id: doc.id,
+        nombre: data.nombre || "",
+        apellido: data.apellido || "",
+        rut: data.rut || "",
+        email: data.email || "",
+        telefono: data.telefono || "",
+        fechaNacimiento: data.fechaNacimiento || "",
+        direccion: data.direccion || "",
+        diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        activo: typeof data.activo === "boolean" ? data.activo : true,
+        createdAt: data.createdAt || Date.now(),
+        fechaAlta: data.fechaAlta || null,
+        notasAlta: data.notasAlta || null,
+      } as Paciente
+    })
   } catch (error) {
     console.error("Error al obtener pacientes:", error)
     return []
@@ -77,10 +93,91 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
-      return {
+      const data = docSnap.data()
+
+      // Asegurarse de que todos los campos requeridos existan
+      const paciente: Paciente = {
         id: docSnap.id,
-        ...docSnap.data(),
-      } as Paciente
+        nombre: data.nombre || "",
+        apellido: data.apellido || "",
+        rut: data.rut || "",
+        email: data.email || "",
+        telefono: data.telefono || "",
+        fechaNacimiento: data.fechaNacimiento || "",
+        direccion: data.direccion || "",
+        diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        activo: typeof data.activo === "boolean" ? data.activo : true,
+        createdAt: data.createdAt || Date.now(),
+        fechaAlta: data.fechaAlta || null,
+        notasAlta: data.notasAlta || null,
+      }
+
+      return paciente
+    }
+
+    // Si no se encuentra el paciente, intentar buscar por RUT
+    console.log("Paciente no encontrado por ID, intentando buscar por otros medios...")
+
+    // Intentar buscar por RUT si el ID parece ser un RUT
+    if (id.includes(".") || id.includes("-")) {
+      console.log("El ID parece ser un RUT, buscando por RUT...")
+      const rutLimpio = id.replace(/\./g, "").replace(/-/g, "")
+
+      const pacientesRef = collection(firestore, "pacientes")
+      const q = query(pacientesRef, where("rut", "==", id))
+      const snapshot = await getDocs(q)
+
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0]
+        const data = doc.data()
+
+        return {
+          id: doc.id,
+          nombre: data.nombre || "",
+          apellido: data.apellido || "",
+          rut: data.rut || "",
+          email: data.email || "",
+          telefono: data.telefono || "",
+          fechaNacimiento: data.fechaNacimiento || "",
+          direccion: data.direccion || "",
+          diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+          antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+          activo: typeof data.activo === "boolean" ? data.activo : true,
+          createdAt: data.createdAt || Date.now(),
+          fechaAlta: data.fechaAlta || null,
+          notasAlta: data.notasAlta || null,
+        }
+      }
+    }
+
+    // Como último recurso, obtener todos los pacientes y buscar por coincidencia parcial
+    console.log("Intentando buscar paciente en toda la colección...")
+    const pacientesRef = collection(firestore, "pacientes")
+    const snapshot = await getDocs(pacientesRef)
+
+    // Buscar coincidencia por ID parcial (por si el ID está truncado o formateado diferente)
+    const pacienteEncontrado = snapshot.docs.find((doc) => doc.id === id || doc.id.includes(id) || id.includes(doc.id))
+
+    if (pacienteEncontrado) {
+      const data = pacienteEncontrado.data()
+
+      return {
+        id: pacienteEncontrado.id,
+        nombre: data.nombre || "",
+        apellido: data.apellido || "",
+        rut: data.rut || "",
+        email: data.email || "",
+        telefono: data.telefono || "",
+        fechaNacimiento: data.fechaNacimiento || "",
+        direccion: data.direccion || "",
+        diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        activo: typeof data.activo === "boolean" ? data.activo : true,
+        createdAt: data.createdAt || Date.now(),
+        fechaAlta: data.fechaAlta || null,
+        notasAlta: data.notasAlta || null,
+      }
     }
 
     return null
