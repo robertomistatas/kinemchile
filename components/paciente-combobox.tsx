@@ -31,13 +31,26 @@ export function PacienteCombobox({
 
   // Filtrar pacientes según el término de búsqueda
   const filteredPacientes = pacientes.filter((paciente) => {
-    const searchTerm = searchValue.toLowerCase()
-    return (
-      paciente.nombre.toLowerCase().includes(searchTerm) ||
-      paciente.apellido.toLowerCase().includes(searchTerm) ||
-      paciente.rut.toLowerCase().includes(searchTerm) ||
-      `${paciente.nombre} ${paciente.apellido}`.toLowerCase().includes(searchTerm)
-    )
+    if (!searchValue.trim()) return true
+
+    const searchTerm = searchValue.toLowerCase().trim()
+
+    // Buscar en nombre completo
+    const nombreCompleto = `${paciente.nombre} ${paciente.apellido}`.toLowerCase()
+    if (nombreCompleto.includes(searchTerm)) return true
+
+    // Buscar en RUT (sin puntos ni guiones para facilitar la búsqueda)
+    const rutLimpio = paciente.rut.replace(/\./g, "").replace(/-/g, "").toLowerCase()
+    const searchTermLimpio = searchTerm.replace(/\./g, "").replace(/-/g, "")
+    if (rutLimpio.includes(searchTermLimpio)) return true
+
+    // Buscar en teléfono
+    if (paciente.telefono && paciente.telefono.toLowerCase().includes(searchTerm)) return true
+
+    // Buscar en email
+    if (paciente.email && paciente.email.toLowerCase().includes(searchTerm)) return true
+
+    return false
   })
 
   return (
@@ -74,7 +87,14 @@ export function PacienteCombobox({
                   <Check
                     className={cn("mr-2 h-4 w-4", selectedPacienteId === paciente.id ? "opacity-100" : "opacity-0")}
                   />
-                  {paciente.nombre} {paciente.apellido} - {paciente.rut}
+                  <div className="flex flex-col">
+                    <span>
+                      {paciente.nombre} {paciente.apellido} - {paciente.rut}
+                    </span>
+                    {paciente.telefono && (
+                      <span className="text-xs text-muted-foreground">Tel: {paciente.telefono}</span>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>

@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
-import { getPacientesActivos } from "@/lib/firestore"
+import { getPacientesActivos, getPaciente } from "@/lib/firestore"
 import type { Paciente } from "@/lib/data"
 import {
   Dialog,
@@ -22,8 +22,10 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Clock } from "lucide-react"
+import { Plus, Edit, Trash2, Clock, AlertCircle, CheckCircle } from "lucide-react"
 import { PacienteCombobox } from "@/components/paciente-combobox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 // Tipo para las citas
 interface Cita {
@@ -33,6 +35,7 @@ interface Cita {
   pacienteId: string
   pacienteNombre: string
   motivo: string
+  prevision?: string
 }
 
 export default function AgendaPage() {
@@ -48,10 +51,13 @@ export default function AgendaPage() {
     fecha: new Date(),
     hora: "09:00",
     motivo: "",
+    prevision: "",
   })
   const [dataLoading, setDataLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState("")
+  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -88,6 +94,7 @@ export default function AgendaPage() {
         pacienteId: "1",
         pacienteNombre: "Juan Pérez",
         motivo: "Control mensual",
+        prevision: "Fonasa",
       },
       {
         id: "2",
@@ -96,10 +103,37 @@ export default function AgendaPage() {
         pacienteId: "2",
         pacienteNombre: "María González",
         motivo: "Evaluación inicial",
+        prevision: "Isapre",
       },
     ]
     setCitas(citasEjemplo)
   }, [])
+
+  useEffect(() => {
+    async function fetchPacienteSeleccionado() {
+      if (!formData.pacienteId) {
+        setSelectedPaciente(null)
+        setFormData((prev) => ({ ...prev, prevision: "" }))
+        return
+      }
+
+      try {
+        const paciente = await getPaciente(formData.pacienteId)
+        setSelectedPaciente(paciente)
+
+        // Si el paciente tiene previsión, actualizar el formulario
+        if (paciente && paciente.prevision) {
+          setFormData((prev) => ({ ...prev, prevision: paciente.prevision }))
+        }
+      } catch (error) {
+        console.error("Error al cargar paciente seleccionado:", error)
+      }
+    }
+
+    if (formData.pacienteId) {
+      fetchPacienteSeleccionado()
+    }
+  }, [formData.pacienteId])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -118,29 +152,47 @@ export default function AgendaPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setSubmitting(true)
+    setError("")
+    setSuccess(false)
 
-    const paciente = pacientes.find((p) => p.id === formData.pacienteId)
-
-    if (!paciente) return
-
-    const nuevaCita: Cita = {
-      id: citaEnEdicion ? citaEnEdicion.id : Date.now().toString(),
-      fecha: formData.fecha,
-      hora: formData.hora,
-      pacienteId: formData.pacienteId,
-      pacienteNombre: `${paciente.nombre} ${paciente.apellido}`,
-      motivo: formData.motivo,
+    if (!formData.pacienteId || !selectedPaciente) {
+      setError("Debes seleccionar un paciente")
+      setSubmitting(false)
+      return
     }
 
-    if (citaEnEdicion) {
-      // Actualizar cita existente
-      setCitas(citas.map((c) => (c.id === citaEnEdicion.id ? nuevaCita : c)))
-    } else {
-      // Agregar nueva cita
-      setCitas([...citas, nuevaCita])
-    }
+    try {
+      const nuevaCita: Cita = {
+        id: citaEnEdicion ? citaEnEdicion.id : Date.now().toString(),
+        fecha: formData.fecha,
+        hora: formData.hora,
+        pacienteId: formData.pacienteId,
+        pacienteNombre: `${selectedPaciente.nombre} ${selectedPaciente.apellido}`,
+        motivo: formData.motivo,
+        prevision: formData.prevision,
+      }
 
-    resetForm()
+      if (citaEnEdicion) {
+        // Actualizar cita existente
+        setCitas(citas.map((c) => (c.id === citaEnEdicion.id ? nuevaCita : c)))
+      } else {
+        // Agregar nueva cita
+        setCitas([...citas, nuevaCita])
+      }
+
+      setSuccess(true)
+
+      // Esperar 1.5 segundos antes de cerrar el diálogo
+      setTimeout(() => {
+        resetForm()
+      }, 1500)
+    } catch (error) {
+      console.error("Error al guardar cita:", error)
+      setError("Error al procesar la solicitud. Por favor, intenta nuevamente.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleEditarCita = (cita: Cita) => {
@@ -150,6 +202,7 @@ export default function AgendaPage() {
       fecha: cita.fecha,
       hora: cita.hora,
       motivo: cita.motivo,
+      prevision: cita.prevision || "",
     })
     setShowNuevaCita(true)
   }
@@ -164,9 +217,13 @@ export default function AgendaPage() {
       fecha: new Date(),
       hora: "09:00",
       motivo: "",
+      prevision: "",
     })
+    setSelectedPaciente(null)
     setCitaEnEdicion(null)
     setShowNuevaCita(false)
+    setSuccess(false)
+    setError("")
   }
 
   // Filtrar citas por fecha seleccionada
@@ -229,6 +286,9 @@ export default function AgendaPage() {
                           <p className="text-sm text-muted-foreground">
                             {cita.hora} - {cita.motivo}
                           </p>
+                          {cita.prevision && (
+                            <p className="text-xs text-muted-foreground">Previsión: {cita.prevision}</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -251,7 +311,7 @@ export default function AgendaPage() {
 
         {/* Diálogo para nueva cita */}
         <Dialog open={showNuevaCita} onOpenChange={setShowNuevaCita}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{citaEnEdicion ? "Editar Cita" : "Nueva Cita"}</DialogTitle>
               <DialogDescription>
@@ -260,6 +320,23 @@ export default function AgendaPage() {
                   : "Completa el formulario para agendar una nueva cita."}
               </DialogDescription>
             </DialogHeader>
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {success && (
+              <Alert className="border-green-500 text-green-500">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {citaEnEdicion ? "Cita actualizada correctamente." : "Cita agendada correctamente."}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
@@ -272,6 +349,28 @@ export default function AgendaPage() {
                     placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
                   />
                 </div>
+
+                {selectedPaciente && (
+                  <div className="p-3 bg-muted rounded-md text-sm">
+                    <p>
+                      <strong>Paciente:</strong> {selectedPaciente.nombre} {selectedPaciente.apellido}
+                    </p>
+                    <p>
+                      <strong>RUT:</strong> {selectedPaciente.rut}
+                    </p>
+                    {selectedPaciente.telefono && (
+                      <p>
+                        <strong>Teléfono:</strong> {selectedPaciente.telefono}
+                      </p>
+                    )}
+                    {selectedPaciente.prevision && (
+                      <p>
+                        <strong>Previsión:</strong> {selectedPaciente.prevision}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fecha">Fecha</Label>
@@ -294,9 +393,29 @@ export default function AgendaPage() {
                       value={formData.hora}
                       onChange={handleInputChange}
                       required
+                      disabled={submitting || success}
                     />
+
+                    <Label htmlFor="prevision" className="mt-4">
+                      Previsión
+                    </Label>
+                    <Select
+                      value={formData.prevision}
+                      onValueChange={(value) => handleSelectChange("prevision", value)}
+                      disabled={submitting || success}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona previsión" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Particular">Particular</SelectItem>
+                        <SelectItem value="Fonasa">Fonasa</SelectItem>
+                        <SelectItem value="Isapre">Isapre</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="motivo">Motivo</Label>
                   <Textarea
@@ -306,14 +425,17 @@ export default function AgendaPage() {
                     onChange={handleInputChange}
                     placeholder="Motivo de la cita"
                     rows={3}
+                    disabled={submitting || success}
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetForm}>
+                <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
                   Cancelar
                 </Button>
-                <Button type="submit">{citaEnEdicion ? "Guardar cambios" : "Agendar cita"}</Button>
+                <Button type="submit" disabled={submitting || success}>
+                  {submitting ? "Guardando..." : citaEnEdicion ? "Guardar cambios" : "Agendar cita"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

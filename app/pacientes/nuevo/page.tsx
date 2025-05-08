@@ -16,6 +16,7 @@ import { useAuth } from "@/context/auth-context"
 import { crearPaciente } from "@/lib/firestore"
 import Link from "next/link"
 import { validarRut, formatearRut } from "@/lib/utils"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function NuevoPacientePage() {
   const { user, loading } = useAuth()
@@ -29,7 +30,12 @@ export default function NuevoPacientePage() {
     fechaNacimiento: "",
     direccion: "",
     diagnostico: "",
+    diagnosticoMedico: "",
     antecedentesPersonales: "",
+    antecedentesClinicosRelevantes: "",
+    edad: "",
+    genero: "",
+    prevision: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -50,6 +56,15 @@ export default function NuevoPacientePage() {
     } else {
       setFormData({ ...formData, [name]: value })
     }
+
+    // Limpiar error del campo
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: "" })
+    }
+  }
+
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData({ ...formData, [name]: value })
 
     // Limpiar error del campo
     if (errors[name]) {
@@ -102,7 +117,12 @@ export default function NuevoPacientePage() {
         fechaNacimiento: formData.fechaNacimiento,
         direccion: formData.direccion,
         diagnostico: formData.diagnostico,
+        diagnosticoMedico: formData.diagnosticoMedico,
         antecedentesPersonales: formData.antecedentesPersonales,
+        antecedentesClinicosRelevantes: formData.antecedentesClinicosRelevantes,
+        edad: formData.edad,
+        genero: formData.genero,
+        prevision: formData.prevision,
       })
 
       router.push(`/pacientes/${pacienteId}`)
@@ -193,6 +213,29 @@ export default function NuevoPacientePage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="edad">Edad</Label>
+                    <Input
+                      id="edad"
+                      name="edad"
+                      value={formData.edad}
+                      onChange={handleChange}
+                      placeholder="Edad del paciente"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="genero">Género</Label>
+                    <Select value={formData.genero} onValueChange={(value) => handleSelectChange("genero", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un género" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -213,6 +256,22 @@ export default function NuevoPacientePage() {
                       onChange={handleChange}
                       placeholder="+56 9 1234 5678"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="prevision">Previsión</Label>
+                    <Select
+                      value={formData.prevision}
+                      onValueChange={(value) => handleSelectChange("prevision", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona una previsión" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Particular">Particular</SelectItem>
+                        <SelectItem value="Fonasa">Fonasa</SelectItem>
+                        <SelectItem value="Isapre">Isapre</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="direccion">Dirección</Label>
@@ -235,24 +294,24 @@ export default function NuevoPacientePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="diagnostico">Diagnóstico</Label>
+                  <Label htmlFor="diagnosticoMedico">Diagnóstico Médico</Label>
                   <Textarea
-                    id="diagnostico"
-                    name="diagnostico"
-                    value={formData.diagnostico}
+                    id="diagnosticoMedico"
+                    name="diagnosticoMedico"
+                    value={formData.diagnosticoMedico}
                     onChange={handleChange}
-                    placeholder="Diagnóstico del paciente"
+                    placeholder="Diagnóstico médico del paciente"
                     rows={3}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="antecedentesPersonales">Antecedentes Personales</Label>
+                  <Label htmlFor="antecedentesClinicosRelevantes">Antecedentes Clínicos Relevantes</Label>
                   <Textarea
-                    id="antecedentesPersonales"
-                    name="antecedentesPersonales"
-                    value={formData.antecedentesPersonales}
+                    id="antecedentesClinicosRelevantes"
+                    name="antecedentesClinicosRelevantes"
+                    value={formData.antecedentesClinicosRelevantes}
                     onChange={handleChange}
-                    placeholder="Antecedentes personales del paciente"
+                    placeholder="Antecedentes clínicos relevantes del paciente"
                     rows={3}
                   />
                 </div>
