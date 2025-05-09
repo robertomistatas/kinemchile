@@ -70,14 +70,43 @@ export async function getPacientesActivos(): Promise<Paciente[]> {
 
   try {
     console.log("Obteniendo pacientes activos...")
-    const pacientesRef = collection(firestore, "pacientes")
-    const q = query(pacientesRef, where("activo", "==", true), orderBy("createdAt", "desc"))
-    const snapshot = await getDocs(q)
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Paciente[]
+    // Primero intentamos con la consulta filtrada
+    try {
+      const pacientesRef = collection(firestore, "pacientes")
+      const q = query(pacientesRef, where("activo", "==", true), orderBy("createdAt", "desc"))
+      const snapshot = await getDocs(q)
+
+      console.log(`Consulta filtrada: Se encontraron ${snapshot.docs.length} pacientes activos`)
+
+      if (snapshot.docs.length > 0) {
+        return snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Paciente[]
+      }
+    } catch (error) {
+      console.error("Error en consulta filtrada:", error)
+    }
+
+    // Si la consulta filtrada falla o no devuelve resultados, intentamos obtener todos los pacientes
+    console.log("Intentando obtener todos los pacientes...")
+    const pacientesRef = collection(firestore, "pacientes")
+    const snapshot = await getDocs(pacientesRef)
+
+    console.log(`Se encontraron ${snapshot.docs.length} pacientes en total`)
+
+    // Filtrar los activos en memoria
+    const pacientesActivos = snapshot.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+      .filter((p) => p.activo !== false) as Paciente[]
+
+    console.log(`Filtrados en memoria: ${pacientesActivos.length} pacientes activos`)
+
+    return pacientesActivos
   } catch (error) {
     console.error("Error al obtener pacientes activos:", error)
     return []

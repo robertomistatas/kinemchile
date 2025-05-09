@@ -10,7 +10,6 @@ import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import {
-  getPacientesActivos,
   getPaciente,
   crearPaciente,
   getCitasPorFecha,
@@ -49,7 +48,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatearRut, validarRut } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { PacienteComboboxSimple } from "@/components/paciente-combobox-simple"
+import { collection, getDocs, getDb } from "@/lib/firebase"
+import { DebugPacientesDialog } from "@/components/debug-pacientes-dialog"
 
 export default function AgendaPage() {
   const { user, loading } = useAuth()
@@ -94,7 +94,16 @@ export default function AgendaPage() {
       try {
         setDataLoading(true)
         console.log("Cargando pacientes para el diálogo de citas...")
-        const data = await getPacientesActivos()
+
+        // Obtener todos los pacientes (sin filtrar)
+        const pacientesRef = collection(getDb(), "pacientes")
+        const snapshot = await getDocs(pacientesRef)
+
+        const data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Paciente[]
+
         console.log(`Pacientes cargados en Agenda: ${data.length}`)
 
         // Verificar que los datos tengan la estructura correcta
@@ -106,7 +115,7 @@ export default function AgendaPage() {
             rut: data[0].rut,
           })
         } else {
-          console.log("No se encontraron pacientes activos")
+          console.log("No se encontraron pacientes")
         }
 
         setPacientes(data)
@@ -649,17 +658,32 @@ export default function AgendaPage() {
                               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
                             </div>
                           )}
-                          <PacienteComboboxSimple
-                            pacientes={pacientes}
-                            selectedPacienteId={formData.pacienteId}
-                            onSelect={(value) => {
-                              console.log("Paciente seleccionado en diálogo:", value)
-                              handleSelectChange("pacienteId", value)
-                            }}
-                            onCreateNew={() => setActiveTab("paciente-nuevo")}
+
+                          {/* Selector de pacientes */}
+                          <Select
+                            value={formData.pacienteId}
+                            onValueChange={(value) => handleSelectChange("pacienteId", value)}
                             disabled={dataLoading || submitting || success}
-                            placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
-                          />
+                          >
+                            <SelectTrigger>
+                              <SelectValue
+                                placeholder={dataLoading ? "Cargando pacientes..." : "Selecciona un paciente"}
+                              />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[300px]">
+                              {pacientes.length === 0 ? (
+                                <div className="p-2 text-center text-sm text-muted-foreground">
+                                  No hay pacientes disponibles
+                                </div>
+                              ) : (
+                                pacientes.map((paciente) => (
+                                  <SelectItem key={paciente.id} value={paciente.id}>
+                                    {paciente.nombre} {paciente.apellido} - {paciente.rut}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
                         </div>
 
                         {pacientes.length === 0 && !dataLoading && (
@@ -667,25 +691,28 @@ export default function AgendaPage() {
                             No hay pacientes disponibles. Crea un nuevo paciente en la pestaña "Paciente nuevo".
                           </p>
                         )}
-                      </div>
 
-                      {/* Botón de depuración - solo visible en desarrollo */}
-                      {process.env.NODE_ENV !== "production" && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 text-xs"
-                          onClick={() => {
-                            console.log("Pacientes disponibles:", pacientes.length)
-                            console.log("Pacientes:", pacientes.slice(0, 5))
-                            console.log("ID seleccionado:", formData.pacienteId)
-                            console.log("Paciente seleccionado:", selectedPaciente)
-                          }}
-                        >
-                          Debug: Ver pacientes en consola
-                        </Button>
-                      )}
+                        {/* Botón de depuración - solo visible en desarrollo */}
+                        {process.env.NODE_ENV !== "production" && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2 text-xs"
+                            onClick={() => {
+                              console.log("Pacientes disponibles:", pacientes.length)
+                              console.log("Pacientes:", pacientes.slice(0, 5))
+                              console.log("ID seleccionado:", formData.pacienteId)
+                              console.log("Paciente seleccionado:", selectedPaciente)
+                            }}
+                          >
+                            Debug: Ver pacientes en consola
+                          </Button>
+                        )}
+
+                        {/* Componente de depuración */}
+                        {process.env.NODE_ENV !== "production" && <DebugPacientesDialog />}
+                      </div>
 
                       {selectedPaciente && (
                         <div className="p-3 bg-muted rounded-md text-sm">

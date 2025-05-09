@@ -1,4 +1,4 @@
-"use client"
+"\"use client"
 
 import { initializeApp, getApps, getApp } from "firebase/app"
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"
@@ -101,3 +101,12 @@ export {
 export const getFirebaseApp = () => firebaseApp
 export const getFirebaseAuth = () => firebaseAuth
 export const getFirestoreDB = () => firestore
+
+// Funcion para obtener la instancia de Firestore
+export function getDb() {
+  const { db: firestore } = initFirebase()
+  if (!firestore) {
+    console.error("Firestore no está inicializado")
+  }
+  return firestore
+}
