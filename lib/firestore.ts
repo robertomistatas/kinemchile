@@ -13,4 +13,9 @@ export {
   crearSesion,
   actualizarSesion,
   eliminarSesion,
+  getCitasPorFecha,
+  crearCita,
+  actualizarCita,
+  eliminarCita,
+  cambiarEstadoCita,
 } from "@/lib/firestore-service"

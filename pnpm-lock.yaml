@@ -2026,8 +2026,8 @@ packages:
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
 
-  protobufjs@7.4.0:
-    resolution: {integrity: sha512-mRUWCc3KUU4w1jU8sGxICXH/gNS94DvI1gxqDvBzhj1JpcsimQkYiOJfwsPUykUI5ZaspFbSgmBLER8IrQ3tqw==}
+  protobufjs@7.5.1:
+    resolution: {integrity: sha512-3qx3IRjR9WPQKagdwrKjO3Gu8RgQR2qqw+1KnigWhoVjFqegIj1K3bP11sGqhxrO46/XL7lekuG4jmjL+4cLsw==}
     engines: {node: '>=12.0.0'}
 
   queue-microtask@1.2.3:
@@ -2765,7 +2765,7 @@ snapshots:
     dependencies:
       lodash.camelcase: 4.3.0
       long: 5.3.2
-      protobufjs: 7.4.0
+      protobufjs: 7.5.1
       yargs: 17.7.2
 
   '@hookform/resolvers@3.9.1(react-hook-form@7.54.1(react@19.0.0))':
@@ -4360,7 +4360,7 @@ snapshots:
       object-assign: 4.1.1
       react-is: 16.13.1
 
-  protobufjs@7.4.0:
+  protobufjs@7.5.1:
     dependencies:
       '@protobufjs/aspromise': 1.1.2
       '@protobufjs/base64': 1.1.2

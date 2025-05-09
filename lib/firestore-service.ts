@@ -15,7 +15,7 @@ import {
   serverTimestamp,
   deleteField,
 } from "@/lib/firebase"
-import type { Paciente, Sesion } from "./data"
+import type { Paciente, Sesion, Cita } from "./data"
 
 // Función para obtener la instancia de Firestore
 function getDb() {
@@ -55,6 +55,7 @@ export async function getPacientes(): Promise<Paciente[]> {
         createdAt: data.createdAt || Date.now(),
         fechaAlta: data.fechaAlta || null,
         notasAlta: data.notasAlta || null,
+        prevision: data.prevision || "",
       } as Paciente
     })
   } catch (error) {
@@ -488,6 +489,229 @@ export async function eliminarSesion(id: string) {
   }
 }
 
+// Funciones para citas
+export async function getCitas(): Promise<Cita[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log("Obteniendo citas...")
+    const citasRef = collection(firestore, "citas")
+    const q = query(citasRef, orderBy("fecha", "desc"))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      // Asegurarse de que la fecha sea un número
+      const fecha = typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha
+
+      return {
+        id: doc.id,
+        ...data,
+        fecha,
+      }
+    }) as Cita[]
+  } catch (error) {
+    console.error("Error al obtener citas:", error)
+    return []
+  }
+}
+
+export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`Obteniendo citas para la fecha: ${fecha.toLocaleDateString()}`)
+
+    // Crear timestamps para el inicio y fin del día
+    const inicioDelDia = new Date(fecha)
+    inicioDelDia.setHours(0, 0, 0, 0)
+    const finDelDia = new Date(fecha)
+    finDelDia.setHours(23, 59, 59, 999)
+
+    const inicioTimestamp = inicioDelDia.getTime()
+    const finTimestamp = finDelDia.getTime()
+
+    const citasRef = collection(firestore, "citas")
+    const q = query(
+      citasRef,
+      where("fecha", ">=", inicioTimestamp),
+      where("fecha", "<=", finTimestamp),
+      orderBy("fecha", "asc"),
+    )
+
+    const snapshot = await getDocs(q)
+    console.log(`Se encontraron ${snapshot.docs.length} citas para la fecha ${fecha.toLocaleDateString()}`)
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        fecha: typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha,
+      }
+    }) as Cita[]
+  } catch (error) {
+    console.error(`Error al obtener citas para la fecha ${fecha.toLocaleDateString()}:`, error)
+    return []
+  }
+}
+
+export async function getCitasPaciente(pacienteId: string): Promise<Cita[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`Obteniendo citas del paciente con ID: ${pacienteId}`)
+
+    // Verificar que el ID del paciente sea válido
+    if (!pacienteId || pacienteId.trim() === "") {
+      console.error("ID de paciente inválido")
+      return []
+    }
+
+    const citasRef = collection(firestore, "citas")
+
+    // Intentamos con el ID exacto
+    const q = query(citasRef, where("pacienteId", "==", pacienteId), orderBy("fecha", "desc"))
+
+    const snapshot = await getDocs(q)
+    console.log(`Se encontraron ${snapshot.docs.length} citas para el paciente con ID ${pacienteId}`)
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        fecha: typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha,
+      }
+    }) as Cita[]
+  } catch (error) {
+    console.error(`Error al obtener citas del paciente ${pacienteId}:`, error)
+    return []
+  }
+}
+
+export async function getCita(id: string): Promise<Cita | null> {
+  const firestore = getDb()
+  if (!firestore) return null
+
+  try {
+    console.log(`Obteniendo cita con ID: ${id}`)
+    const docRef = doc(firestore, "citas", id)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+      const data = docSnap.data()
+      // Asegurarse de que la fecha sea un número
+      const fecha = typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha
+
+      return {
+        id: docSnap.id,
+        ...data,
+        fecha,
+      } as Cita
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error al obtener cita:", error)
+    return null
+  }
+}
+
+export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "estado" | "updatedAt">): Promise<string> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log("Creando nueva cita con datos:", JSON.stringify(cita))
+
+    // Asegurarse de que la fecha sea un timestamp
+    let fechaTimestamp = cita.fecha
+    if (typeof cita.fecha === "string") {
+      fechaTimestamp = new Date(cita.fecha).getTime()
+    }
+
+    // Asegurarse de que el pacienteId sea una cadena
+    const pacienteId = String(cita.pacienteId)
+
+    const citaData = {
+      ...cita,
+      fecha: fechaTimestamp,
+      pacienteId: pacienteId,
+      estado: "programada",
+      createdAt: serverTimestamp(),
+    }
+
+    console.log("Datos finales de la cita a guardar:", citaData)
+    const docRef = await addDoc(collection(firestore, "citas"), citaData)
+    console.log(`Cita creada con ID: ${docRef.id}`)
+    return docRef.id
+  } catch (error) {
+    console.error("Error al crear cita:", error)
+    throw error
+  }
+}
+
+export async function actualizarCita(id: string, cita: Partial<Omit<Cita, "id" | "createdAt">>): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Actualizando cita con ID: ${id}`)
+    const docRef = doc(firestore, "citas", id)
+
+    // Añadir timestamp de actualización
+    const dataToUpdate = {
+      ...cita,
+      updatedAt: serverTimestamp(),
+    }
+
+    await updateDoc(docRef, dataToUpdate)
+    console.log("Cita actualizada correctamente")
+  } catch (error) {
+    console.error("Error al actualizar cita:", error)
+    throw error
+  }
+}
+
+export async function cambiarEstadoCita(id: string, estado: "programada" | "completada" | "cancelada"): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Cambiando estado de la cita ${id} a: ${estado}`)
+    const docRef = doc(firestore, "citas", id)
+
+    await updateDoc(docRef, {
+      estado,
+      updatedAt: serverTimestamp(),
+    })
+
+    console.log(`Estado de la cita ${id} actualizado a: ${estado}`)
+  } catch (error) {
+    console.error(`Error al cambiar estado de la cita ${id}:`, error)
+    throw error
+  }
+}
+
+export async function eliminarCita(id: string): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Eliminando cita con ID: ${id}`)
+    const docRef = doc(firestore, "citas", id)
+    await deleteDoc(docRef)
+    console.log("Cita eliminada correctamente")
+  } catch (error) {
+    console.error("Error al eliminar cita:", error)
+    throw error
+  }
+}
+
 // Función de depuración para verificar la estructura de la colección de sesiones
 export async function debugSesiones() {
   const firestore = getDb()
@@ -543,6 +767,66 @@ export async function debugSesiones() {
     return sesiones
   } catch (error) {
     console.error("Error al depurar sesiones:", error)
+    return []
+  }
+}
+
+// Función de depuración para verificar la estructura de la colección de citas
+export async function debugCitas() {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log("Depurando colección de citas...")
+    const citasRef = collection(firestore, "citas")
+    const snapshot = await getDocs(citasRef)
+
+    console.log(`Total de citas en la colección: ${snapshot.docs.length}`)
+
+    const citas = snapshot.docs.map((doc) => {
+      const data = doc.data()
+
+      // Extraer información relevante para depuración
+      let fechaInfo = "desconocido"
+      if (data.fecha) {
+        if (typeof data.fecha === "number") {
+          fechaInfo = `número: ${data.fecha} (${new Date(data.fecha).toLocaleString()})`
+        } else if (typeof data.fecha === "string") {
+          fechaInfo = `string: ${data.fecha}`
+        } else if (typeof data.fecha === "object") {
+          if (data.fecha.toDate) {
+            fechaInfo = `timestamp: ${data.fecha.toDate().toLocaleString()}`
+          } else if (data.fecha.seconds) {
+            fechaInfo = `firestore timestamp: ${new Date(data.fecha.seconds * 1000).toLocaleString()}`
+          } else {
+            fechaInfo = `objeto: ${JSON.stringify(data.fecha)}`
+          }
+        }
+      }
+
+      // Extraer información del paciente
+      let pacienteInfo = "desconocido"
+      if (data.paciente) {
+        pacienteInfo = `id: ${data.paciente.id || "N/A"}, nombre: ${data.paciente.nombre || "N/A"} ${data.paciente.apellido || "N/A"}, rut: ${data.paciente.rut || "N/A"}`
+      }
+
+      return {
+        id: doc.id,
+        ...data,
+        _debug: {
+          fechaInfo,
+          pacienteInfo,
+          pacienteIdTipo: typeof data.pacienteId,
+          estado: data.estado || "N/A",
+          hora: data.hora || "N/A",
+        },
+      }
+    })
+
+    console.log("Estructura de citas:", citas)
+    return citas
+  } catch (error) {
+    console.error("Error al depurar citas:", error)
     return []
   }
 }

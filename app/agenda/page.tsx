@@ -9,8 +9,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
-import { getPacientesActivos, getPaciente, crearPaciente } from "@/lib/firestore"
-import type { Paciente } from "@/lib/data"
+import {
+  getPacientesActivos,
+  getPaciente,
+  crearPaciente,
+  getCitasPorFecha,
+  crearCita,
+  actualizarCita,
+  eliminarCita,
+  cambiarEstadoCita,
+} from "@/lib/firestore"
+import type { Paciente, Cita } from "@/lib/data"
 import {
   Dialog,
   DialogContent,
@@ -22,23 +31,25 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Clock, AlertCircle, CheckCircle, UserPlus } from "lucide-react"
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Clock,
+  AlertCircle,
+  CheckCircle,
+  UserPlus,
+  CalendarIcon,
+  Check,
+  X,
+  MoreHorizontal,
+} from "lucide-react"
 import { PacienteCombobox } from "@/components/paciente-combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatearRut, validarRut } from "@/lib/utils"
-
-// Tipo para las citas
-interface Cita {
-  id: string
-  fecha: Date
-  hora: string
-  pacienteId: string
-  pacienteNombre: string
-  motivo: string
-  prevision?: string
-}
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export default function AgendaPage() {
   const { user, loading } = useAuth()
@@ -56,6 +67,7 @@ export default function AgendaPage() {
     prevision: "",
   })
   const [dataLoading, setDataLoading] = useState(false)
+  const [citasLoading, setCitasLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState("")
@@ -69,6 +81,7 @@ export default function AgendaPage() {
     prevision: "",
   })
   const [nuevoPacienteErrors, setNuevoPacienteErrors] = useState<Record<string, string>>({})
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -81,7 +94,7 @@ export default function AgendaPage() {
       try {
         setDataLoading(true)
         const data = await getPacientesActivos()
-        console.log("Pacientes cargados:", data.length)
+        console.log("Pacientes cargados en Agenda:", data.length)
         setPacientes(data)
       } catch (error) {
         console.error("Error al cargar pacientes:", error)
@@ -95,31 +108,27 @@ export default function AgendaPage() {
     }
   }, [user])
 
-  // Datos de ejemplo para citas
+  // Cargar citas para la fecha seleccionada
   useEffect(() => {
-    // En una implementación real, esto vendría de la base de datos
-    const citasEjemplo: Cita[] = [
-      {
-        id: "1",
-        fecha: new Date(),
-        hora: "09:00",
-        pacienteId: "1",
-        pacienteNombre: "Juan Pérez",
-        motivo: "Control mensual",
-        prevision: "Fonasa",
-      },
-      {
-        id: "2",
-        fecha: new Date(),
-        hora: "10:30",
-        pacienteId: "2",
-        pacienteNombre: "María González",
-        motivo: "Evaluación inicial",
-        prevision: "Isapre",
-      },
-    ]
-    setCitas(citasEjemplo)
-  }, [])
+    async function fetchCitas() {
+      if (!date) return
+
+      try {
+        setCitasLoading(true)
+        const citasData = await getCitasPorFecha(date)
+        console.log(`Citas cargadas para ${date.toLocaleDateString()}:`, citasData.length)
+        setCitas(citasData)
+      } catch (error) {
+        console.error("Error al cargar citas:", error)
+      } finally {
+        setCitasLoading(false)
+      }
+    }
+
+    if (user && date) {
+      fetchCitas()
+    }
+  }, [user, date])
 
   useEffect(() => {
     async function fetchPacienteSeleccionado() {
@@ -256,7 +265,7 @@ export default function AgendaPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError("")
@@ -274,22 +283,57 @@ export default function AgendaPage() {
         return
       }
 
-      const nuevaCita: Cita = {
-        id: citaEnEdicion ? citaEnEdicion.id : Date.now().toString(),
-        fecha: formData.fecha,
+      // Crear objeto de fecha combinando la fecha y hora
+      const fechaHora = new Date(formData.fecha)
+      const [horas, minutos] = formData.hora.split(":").map(Number)
+      fechaHora.setHours(horas, minutos, 0, 0)
+
+      // Datos de la cita
+      const citaData = {
+        fecha: fechaHora.getTime(),
         hora: formData.hora,
         pacienteId: formData.pacienteId,
-        pacienteNombre: `${selectedPaciente.nombre} ${selectedPaciente.apellido}`,
+        paciente: {
+          id: selectedPaciente.id,
+          nombre: selectedPaciente.nombre,
+          apellido: selectedPaciente.apellido,
+          rut: selectedPaciente.rut,
+        },
         motivo: formData.motivo,
         prevision: formData.prevision,
       }
 
       if (citaEnEdicion) {
         // Actualizar cita existente
-        setCitas(citas.map((c) => (c.id === citaEnEdicion.id ? nuevaCita : c)))
+        await actualizarCita(citaEnEdicion.id, citaData)
+
+        // Actualizar la lista de citas
+        setCitas(
+          citas.map((c) =>
+            c.id === citaEnEdicion.id
+              ? ({
+                  ...citaData,
+                  id: citaEnEdicion.id,
+                  estado: citaEnEdicion.estado,
+                  createdAt: citaEnEdicion.createdAt,
+                } as Cita)
+              : c,
+          ),
+        )
       } else {
-        // Agregar nueva cita
-        setCitas([...citas, nuevaCita])
+        // Crear nueva cita
+        const citaId = await crearCita(citaData)
+
+        // Si la fecha de la cita es la misma que la fecha seleccionada, añadirla a la lista
+        if (fechaHora.toDateString() === date?.toDateString()) {
+          const nuevaCita: Cita = {
+            id: citaId,
+            ...citaData,
+            estado: "programada",
+            createdAt: Date.now(),
+          }
+          setCitas([...citas, nuevaCita])
+        }
       }
 
       setSuccess(true)
@@ -308,19 +352,43 @@ export default function AgendaPage() {
 
   const handleEditarCita = (cita: Cita) => {
     setCitaEnEdicion(cita)
+
+    // Extraer la fecha y hora de la cita
+    const fechaCita = new Date(cita.fecha)
+
     setFormData({
       pacienteId: cita.pacienteId,
-      fecha: cita.fecha,
+      fecha: fechaCita,
       hora: cita.hora,
       motivo: cita.motivo,
       prevision: cita.prevision || "",
     })
+
     setActiveTab("paciente-existente")
     setShowNuevaCita(true)
   }
 
-  const handleEliminarCita = (id: string) => {
-    setCitas(citas.filter((c) => c.id !== id))
+  const handleEliminarCita = async (id: string) => {
+    try {
+      await eliminarCita(id)
+      setCitas(citas.filter((c) => c.id !== id))
+      setConfirmDelete(null)
+    } catch (error) {
+      console.error("Error al eliminar cita:", error)
+      setError("Error al eliminar la cita. Por favor, intenta nuevamente.")
+    }
+  }
+
+  const handleCambiarEstadoCita = async (id: string, nuevoEstado: "programada" | "completada" | "cancelada") => {
+    try {
+      await cambiarEstadoCita(id, nuevoEstado)
+
+      // Actualizar el estado en la lista local
+      setCitas(citas.map((cita) => (cita.id === id ? { ...cita, estado: nuevoEstado, updatedAt: Date.now() } : cita)))
+    } catch (error) {
+      console.error(`Error al cambiar estado de la cita ${id}:`, error)
+      setError("Error al actualizar el estado de la cita. Por favor, intenta nuevamente.")
+    }
   }
 
   const resetForm = () => {
@@ -347,15 +415,30 @@ export default function AgendaPage() {
     setNuevoPacienteErrors({})
   }
 
-  // Filtrar citas por fecha seleccionada
-  const citasDelDia = citas
-    .filter(
-      (cita) =>
-        cita.fecha.getDate() === date?.getDate() &&
-        cita.fecha.getMonth() === date?.getMonth() &&
-        cita.fecha.getFullYear() === date?.getFullYear(),
-    )
-    .sort((a, b) => a.hora.localeCompare(b.hora))
+  // Ordenar citas por hora
+  const citasOrdenadas = [...citas].sort((a, b) => {
+    // Primero por hora
+    const comparacionHora = a.hora.localeCompare(b.hora)
+    if (comparacionHora !== 0) return comparacionHora
+
+    // Si la hora es igual, ordenar por estado (programada, completada, cancelada)
+    const prioridadEstado = { programada: 0, completada: 1, cancelada: 2 }
+    return prioridadEstado[a.estado] - prioridadEstado[b.estado]
+  })
+
+  // Función para obtener el color según el estado
+  const getEstadoColor = (estado: string) => {
+    switch (estado) {
+      case "programada":
+        return "bg-blue-100 text-blue-800"
+      case "completada":
+        return "bg-green-100 text-green-800"
+      case "cancelada":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
 
   if (loading || !user) {
     return null
@@ -382,45 +465,119 @@ export default function AgendaPage() {
               <CardDescription>Selecciona una fecha para ver las citas</CardDescription>
             </CardHeader>
             <CardContent>
-              <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-md border" />
+              <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-md border" initialFocus />
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Citas del día</CardTitle>
-              <CardDescription>{date ? date.toLocaleDateString() : "Selecciona una fecha"}</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Citas del día</CardTitle>
+                <CardDescription>{date ? date.toLocaleDateString() : "Selecciona una fecha"}</CardDescription>
+              </div>
+              {citasLoading && (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {citasDelDia.length === 0 ? (
-                  <p className="text-center text-muted-foreground">No hay citas programadas para este día.</p>
+                {citasOrdenadas.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <p className="text-muted-foreground">No hay citas programadas para este día.</p>
+                    <Button variant="outline" className="mt-4" onClick={() => setShowNuevaCita(true)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Agendar cita
+                    </Button>
+                  </div>
                 ) : (
-                  citasDelDia.map((cita) => (
-                    <div key={cita.id} className="flex items-center justify-between rounded-md border p-4">
+                  citasOrdenadas.map((cita) => (
+                    <div
+                      key={cita.id}
+                      className={`flex items-center justify-between rounded-md border p-4 ${
+                        cita.estado === "cancelada" ? "opacity-60" : ""
+                      }`}
+                    >
                       <div className="flex items-start gap-4">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                          <Clock className="h-5 w-5 text-primary" />
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                            cita.estado === "programada"
+                              ? "bg-blue-100 text-blue-800"
+                              : cita.estado === "completada"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {cita.estado === "programada" ? (
+                            <Clock className="h-5 w-5" />
+                          ) : cita.estado === "completada" ? (
+                            <Check className="h-5 w-5" />
+                          ) : (
+                            <X className="h-5 w-5" />
+                          )}
                         </div>
                         <div>
-                          <p className="font-medium">{cita.pacienteNombre}</p>
+                          <p className="font-medium">
+                            {cita.paciente.nombre} {cita.paciente.apellido}
+                          </p>
                           <p className="text-sm text-muted-foreground">
                             {cita.hora} - {cita.motivo}
                           </p>
-                          {cita.prevision && (
-                            <p className="text-xs text-muted-foreground">Previsión: {cita.prevision}</p>
-                          )}
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getEstadoColor(cita.estado)}`}
+                            >
+                              {cita.estado === "programada"
+                                ? "Programada"
+                                : cita.estado === "completada"
+                                  ? "Completada"
+                                  : "Cancelada"}
+                            </span>
+                            {cita.prevision && (
+                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
+                                {cita.prevision}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditarCita(cita)}>
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Editar</span>
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleEliminarCita(cita.id)}>
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Eliminar</span>
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Opciones</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditarCita(cita)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            {cita.estado !== "completada" && (
+                              <DropdownMenuItem onClick={() => handleCambiarEstadoCita(cita.id, "completada")}>
+                                <Check className="mr-2 h-4 w-4" />
+                                Marcar como completada
+                              </DropdownMenuItem>
+                            )}
+                            {cita.estado !== "cancelada" && (
+                              <DropdownMenuItem onClick={() => handleCambiarEstadoCita(cita.id, "cancelada")}>
+                                <X className="mr-2 h-4 w-4" />
+                                Cancelar cita
+                              </DropdownMenuItem>
+                            )}
+                            {cita.estado !== "programada" && (
+                              <DropdownMenuItem onClick={() => handleCambiarEstadoCita(cita.id, "programada")}>
+                                <Clock className="mr-2 h-4 w-4" />
+                                Marcar como programada
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="text-red-600" onClick={() => setConfirmDelete(cita.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))
@@ -668,6 +825,26 @@ export default function AgendaPage() {
                 </DialogFooter>
               </form>
             </Tabs>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de confirmación para eliminar cita */}
+        <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Confirmar eliminación</DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que deseas eliminar esta cita? Esta acción no se puede deshacer.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setConfirmDelete(null)}>
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={() => confirmDelete && handleEliminarCita(confirmDelete)}>
+                Eliminar
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

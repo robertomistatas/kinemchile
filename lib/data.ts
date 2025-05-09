@@ -47,6 +47,24 @@ export interface Sesion {
   createdAt: number
 }
 
+export interface Cita {
+  id: string
+  fecha: number // timestamp
+  hora: string // formato "HH:MM"
+  pacienteId: string
+  paciente: {
+    id: string
+    nombre: string
+    apellido: string
+    rut: string
+  }
+  motivo: string
+  prevision?: string
+  estado: "programada" | "completada" | "cancelada"
+  createdAt: number
+  updatedAt?: number
+}
+
 export interface Usuario {
   id: string
   nombre: string
