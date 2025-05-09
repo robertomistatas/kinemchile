@@ -95,9 +95,21 @@ export default function AgendaPage() {
         setDataLoading(true)
         const data = await getPacientesActivos()
         console.log("Pacientes cargados en Agenda:", data.length)
+
+        // Verificar que los datos tengan la estructura correcta
+        if (data.length > 0) {
+          console.log("Ejemplo de paciente:", {
+            id: data[0].id,
+            nombre: data[0].nombre,
+            apellido: data[0].apellido,
+            rut: data[0].rut,
+          })
+        }
+
         setPacientes(data)
       } catch (error) {
         console.error("Error al cargar pacientes:", error)
+        setError("Error al cargar la lista de pacientes")
       } finally {
         setDataLoading(false)
       }
@@ -630,7 +642,10 @@ export default function AgendaPage() {
                         <PacienteCombobox
                           pacientes={pacientes}
                           selectedPacienteId={formData.pacienteId}
-                          onSelect={(value) => handleSelectChange("pacienteId", value)}
+                          onSelect={(value) => {
+                            console.log("Paciente seleccionado:", value)
+                            handleSelectChange("pacienteId", value)
+                          }}
                           onCreateNew={() => setActiveTab("paciente-nuevo")}
                           disabled={dataLoading || submitting || success}
                           placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}

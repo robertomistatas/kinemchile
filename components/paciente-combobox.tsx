@@ -38,6 +38,7 @@ export function PacienteCombobox({
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s]/g, "") // Eliminar caracteres especiales
       .trim()
   }
 
@@ -108,6 +109,9 @@ export function PacienteCombobox({
     console.log("Modo debug:", !debugMode)
     if (!debugMode) {
       console.log("Pacientes totales:", pacientes.length)
+      if (pacientes.length > 0) {
+        console.log("Ejemplo de paciente:", pacientes[0])
+      }
     }
   }
 
