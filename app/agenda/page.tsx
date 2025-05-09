@@ -49,7 +49,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatearRut, validarRut } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { collection, getDocs, getDb } from "@/lib/firebase"
-import { DebugPacientesDialog } from "@/components/debug-pacientes-dialog"
+import { PacienteSearchOptimized } from "@/components/paciente-search-optimized"
 
 export default function AgendaPage() {
   const { user, loading } = useAuth()
@@ -653,37 +653,18 @@ export default function AgendaPage() {
                       <div className="space-y-2">
                         <Label htmlFor="paciente">Paciente</Label>
                         <div className="relative">
-                          {dataLoading && (
-                            <div className="absolute right-3 top-3 z-10">
-                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-                            </div>
-                          )}
-
-                          {/* Selector de pacientes */}
-                          <Select
-                            value={formData.pacienteId}
-                            onValueChange={(value) => handleSelectChange("pacienteId", value)}
+                          <PacienteSearchOptimized
+                            pacientes={pacientes}
+                            selectedPacienteId={formData.pacienteId}
+                            onSelect={(value) => {
+                              console.log("Paciente seleccionado en diálogo:", value)
+                              handleSelectChange("pacienteId", value)
+                            }}
+                            onCreateNew={() => setActiveTab("paciente-nuevo")}
                             disabled={dataLoading || submitting || success}
-                          >
-                            <SelectTrigger>
-                              <SelectValue
-                                placeholder={dataLoading ? "Cargando pacientes..." : "Selecciona un paciente"}
-                              />
-                            </SelectTrigger>
-                            <SelectContent className="max-h-[300px]">
-                              {pacientes.length === 0 ? (
-                                <div className="p-2 text-center text-sm text-muted-foreground">
-                                  No hay pacientes disponibles
-                                </div>
-                              ) : (
-                                pacientes.map((paciente) => (
-                                  <SelectItem key={paciente.id} value={paciente.id}>
-                                    {paciente.nombre} {paciente.apellido} - {paciente.rut}
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
+                            placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
+                            loading={dataLoading}
+                          />
                         </div>
 
                         {pacientes.length === 0 && !dataLoading && (
@@ -709,9 +690,6 @@ export default function AgendaPage() {
                             Debug: Ver pacientes en consola
                           </Button>
                         )}
-
-                        {/* Componente de depuración */}
-                        {process.env.NODE_ENV !== "production" && <DebugPacientesDialog />}
                       </div>
 
                       {selectedPaciente && (
