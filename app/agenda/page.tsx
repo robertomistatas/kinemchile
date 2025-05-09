@@ -44,12 +44,12 @@ import {
   X,
   MoreHorizontal,
 } from "lucide-react"
-import { PacienteCombobox } from "@/components/paciente-combobox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { formatearRut, validarRut } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { PacienteComboboxSimple } from "@/components/paciente-combobox-simple"
 
 export default function AgendaPage() {
   const { user, loading } = useAuth()
@@ -93,8 +93,9 @@ export default function AgendaPage() {
     async function fetchPacientes() {
       try {
         setDataLoading(true)
+        console.log("Cargando pacientes para el diálogo de citas...")
         const data = await getPacientesActivos()
-        console.log("Pacientes cargados en Agenda:", data.length)
+        console.log(`Pacientes cargados en Agenda: ${data.length}`)
 
         // Verificar que los datos tengan la estructura correcta
         if (data.length > 0) {
@@ -104,6 +105,8 @@ export default function AgendaPage() {
             apellido: data[0].apellido,
             rut: data[0].rut,
           })
+        } else {
+          console.log("No se encontraron pacientes activos")
         }
 
         setPacientes(data)
@@ -404,6 +407,7 @@ export default function AgendaPage() {
   }
 
   const resetForm = () => {
+    console.log("Reseteando formulario de cita")
     setFormData({
       pacienteId: "",
       fecha: new Date(),
@@ -639,18 +643,49 @@ export default function AgendaPage() {
                     <div className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="paciente">Paciente</Label>
-                        <PacienteCombobox
-                          pacientes={pacientes}
-                          selectedPacienteId={formData.pacienteId}
-                          onSelect={(value) => {
-                            console.log("Paciente seleccionado:", value)
-                            handleSelectChange("pacienteId", value)
-                          }}
-                          onCreateNew={() => setActiveTab("paciente-nuevo")}
-                          disabled={dataLoading || submitting || success}
-                          placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
-                        />
+                        <div className="relative">
+                          {dataLoading && (
+                            <div className="absolute right-3 top-3 z-10">
+                              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+                            </div>
+                          )}
+                          <PacienteComboboxSimple
+                            pacientes={pacientes}
+                            selectedPacienteId={formData.pacienteId}
+                            onSelect={(value) => {
+                              console.log("Paciente seleccionado en diálogo:", value)
+                              handleSelectChange("pacienteId", value)
+                            }}
+                            onCreateNew={() => setActiveTab("paciente-nuevo")}
+                            disabled={dataLoading || submitting || success}
+                            placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
+                          />
+                        </div>
+
+                        {pacientes.length === 0 && !dataLoading && (
+                          <p className="text-sm text-amber-600">
+                            No hay pacientes disponibles. Crea un nuevo paciente en la pestaña "Paciente nuevo".
+                          </p>
+                        )}
                       </div>
+
+                      {/* Botón de depuración - solo visible en desarrollo */}
+                      {process.env.NODE_ENV !== "production" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 text-xs"
+                          onClick={() => {
+                            console.log("Pacientes disponibles:", pacientes.length)
+                            console.log("Pacientes:", pacientes.slice(0, 5))
+                            console.log("ID seleccionado:", formData.pacienteId)
+                            console.log("Paciente seleccionado:", selectedPaciente)
+                          }}
+                        >
+                          Debug: Ver pacientes en consola
+                        </Button>
+                      )}
 
                       {selectedPaciente && (
                         <div className="p-3 bg-muted rounded-md text-sm">
