@@ -26,6 +26,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { jsPDF } from "jspdf"
 import "jspdf-autotable"
 
+// Añadir estas importaciones
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { asignarKinesiologoAPaciente, getUsuarios } from "@/lib/firestore"
+import { PERMISOS } from "@/lib/data"
+import { PermissionGate } from "@/components/permission-gate"
+
 // Importar el componente de depuración
 import { DebugSesiones } from "@/components/debug-sesiones"
 import { DebugPaciente } from "@/components/debug-paciente"
@@ -43,6 +50,14 @@ export default function PacienteDetallePage() {
   const [notasAlta, setNotasAlta] = useState("")
   const [showAltaDialog, setShowAltaDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("informacion")
+
+  // Dentro del componente PacienteDetallePage, añadir estos estados
+  const [kinesiologo, setKinesiologo] = useState("")
+  const [kinesiolocos, setKinesiologos] = useState([])
+  const [asignandoKinesiologo, setAsignandoKinesiologo] = useState(false)
+
+  // Añadir este estado para mensajes de éxito
+  const [success, setSuccess] = useState("")
 
   useEffect(() => {
     if (!loading && !user) {
@@ -102,6 +117,60 @@ export default function PacienteDetallePage() {
       fetchData()
     }
   }, [user, id])
+
+  // Añadir este useEffect para cargar los kinesiólogos
+  useEffect(() => {
+    async function fetchKinesiologos() {
+      try {
+        const usuarios = await getUsuarios()
+        // Filtrar solo los usuarios con rol de kinesiólogo
+        const kinesiologos = usuarios.filter((u) => u.rol === "kinesiologo")
+        setKinesiologos(kinesiologos)
+
+        // Si el paciente tiene un kinesiólogo asignado, seleccionarlo
+        if (paciente?.kinesiologo_id) {
+          setKinesiologo(paciente.kinesiologo_id)
+        }
+      } catch (error) {
+        console.error("Error al cargar kinesiólogos:", error)
+      }
+    }
+
+    if (user && paciente) {
+      fetchKinesiologos()
+    }
+  }, [user, paciente])
+
+  // Añadir esta función para manejar la asignación de kinesiólogo
+  const handleAsignarKinesiologo = async () => {
+    if (!kinesiologo) return
+
+    try {
+      setAsignandoKinesiologo(true)
+
+      // Encontrar el nombre del kinesiólogo seleccionado
+      const kinesiologoSeleccionado = kinesiolocos.find((k) => k.id === kinesiologo)
+      const kinesiologoNombre = kinesiologoSeleccionado ? kinesiologoSeleccionado.nombre : ""
+
+      await asignarKinesiologoAPaciente(id, kinesiologo, kinesiologoNombre)
+
+      // Actualizar el paciente en el estado local
+      setPaciente({
+        ...paciente,
+        kinesiologo_id: kinesiologo,
+        kinesiologo_nombre: kinesiologoNombre,
+      })
+
+      // Mostrar mensaje de éxito
+      setSuccess("Kinesiólogo asignado correctamente")
+      setTimeout(() => setSuccess(""), 3000)
+    } catch (error) {
+      console.error("Error al asignar kinesiólogo:", error)
+      setError("Error al asignar kinesiólogo. Por favor, intenta nuevamente.")
+    } finally {
+      setAsignandoKinesiologo(false)
+    }
+  }
 
   const handleRefresh = () => {
     setRefreshing(true)
@@ -691,6 +760,39 @@ export default function PacienteDetallePage() {
                         <p>{paciente.prevision}</p>
                       </div>
                     )}
+                    {/* Sección de asignación de kinesiólogo */}
+                    <PermissionGate permission={PERMISOS.PACIENTES_ASIGNAR_KINESIOLOGO}>
+                      <div className="space-y-2 mt-4">
+                        <Label htmlFor="kinesiologo">Kinesiólogo Asignado</Label>
+                        <div className="flex gap-2">
+                          <Select value={kinesiologo} onValueChange={setKinesiologo} disabled={asignandoKinesiologo}>
+                            <SelectTrigger id="kinesiologo" className="flex-1">
+                              <SelectValue placeholder="Seleccionar kinesiólogo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="no-asignado">Sin asignar</SelectItem>
+                              {kinesiolocos.map((k) => (
+                                <SelectItem key={k.id} value={k.id}>
+                                  {k.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            onClick={handleAsignarKinesiologo}
+                            disabled={kinesiologo === (paciente?.kinesiologo_id || "") || asignandoKinesiologo}
+                          >
+                            {asignandoKinesiologo ? "Guardando..." : "Guardar"}
+                          </Button>
+                        </div>
+                        {paciente?.kinesiologo_nombre && (
+                          <p className="text-sm text-muted-foreground">
+                            Actualmente asignado a: <span className="font-medium">{paciente.kinesiologo_nombre}</span>
+                          </p>
+                        )}
+                        {success && <p className="text-sm text-green-600">{success}</p>}
+                      </div>
+                    </PermissionGate>
                   </div>
                 </CardContent>
               </Card>

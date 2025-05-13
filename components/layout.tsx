@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, User, Home, Users, Calendar, LogOut, Heart, LayoutDashboard } from "lucide-react"
+import { Menu, User, Home, Users, Calendar, LogOut, Heart, LayoutDashboard, Settings } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 
 interface LayoutProps {
@@ -79,6 +79,21 @@ export function Layout({ children }: LayoutProps) {
                         {item.name}
                       </Link>
                     ))}
+
+                    {/* Enlace a Configuración - solo visible para roberto@mistatas.com */}
+                    {user?.email === "roberto@mistatas.com" && (
+                      <Link
+                        href="/configuracion"
+                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                          pathname === "/configuracion"
+                            ? "bg-primary text-primary-foreground"
+                            : "hover:bg-muted hover:text-foreground"
+                        }`}
+                      >
+                        <Settings className="h-4 w-4" />
+                        Configuración
+                      </Link>
+                    )}
                   </nav>
                 </div>
               </SheetContent>
@@ -103,6 +118,19 @@ export function Layout({ children }: LayoutProps) {
                 {item.name}
               </Link>
             ))}
+
+            {/* Enlace a Configuración - solo visible para roberto@mistatas.com */}
+            {user?.email === "roberto@mistatas.com" && (
+              <Link
+                href="/configuracion"
+                className={`font-medium flex items-center gap-1 ${
+                  pathname === "/configuracion" ? "text-primary" : "text-foreground hover:text-primary"
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                Configuración
+              </Link>
+            )}
           </nav>
           <div className="flex items-center gap-2">
             <DropdownMenu>
@@ -154,3 +182,6 @@ export function Layout({ children }: LayoutProps) {
     </div>
   )
 }
+
+// Exportar como default para compatibilidad
+export default Layout

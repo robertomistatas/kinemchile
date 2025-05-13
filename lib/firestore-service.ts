@@ -15,7 +15,7 @@ import {
   serverTimestamp,
   deleteField,
 } from "@/lib/firebase"
-import type { Paciente, Sesion, Cita } from "./data"
+import type { Paciente, Sesion, Cita, Usuario } from "./data"
 
 // Función para obtener la instancia de Firestore
 function getDb() {
@@ -56,6 +56,8 @@ export async function getPacientes(): Promise<Paciente[]> {
         fechaAlta: data.fechaAlta || null,
         notasAlta: data.notasAlta || null,
         prevision: data.prevision || "",
+        kinesiologo_id: data.kinesiologo_id || null,
+        kinesiologo_nombre: data.kinesiologo_nombre || null,
       } as Paciente
     })
   } catch (error) {
@@ -155,6 +157,8 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         activo: typeof data.activo === "boolean" ? data.activo : true,
         createdAt: data.createdAt || Date.now(),
         updatedAt: data.updatedAt || null,
+        kinesiologo_id: data.kinesiologo_id || null,
+        kinesiologo_nombre: data.kinesiologo_nombre || null,
       }
 
       return paciente
@@ -204,6 +208,8 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
           activo: typeof data.activo === "boolean" ? data.activo : true,
           createdAt: data.createdAt || Date.now(),
           updatedAt: data.updatedAt || null,
+          kinesiologo_id: data.kinesiologo_id || null,
+          kinesiologo_nombre: data.kinesiologo_nombre || null,
         }
       }
     }
@@ -247,6 +253,8 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         activo: typeof data.activo === "boolean" ? data.activo : true,
         createdAt: data.createdAt || Date.now(),
         updatedAt: data.updatedAt || null,
+        kinesiologo_id: data.kinesiologo_id || null,
+        kinesiologo_nombre: data.kinesiologo_nombre || null,
       }
     }
 
@@ -738,6 +746,209 @@ export async function eliminarCita(id: string): Promise<void> {
   } catch (error) {
     console.error("Error al eliminar cita:", error)
     throw error
+  }
+}
+
+// Funciones para usuarios
+export async function getUsuarios(): Promise<Usuario[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log("Obteniendo usuarios...")
+    const usuariosRef = collection(firestore, "usuarios")
+    const snapshot = await getDocs(usuariosRef)
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Usuario[]
+  } catch (error) {
+    console.error("Error al obtener usuarios:", error)
+    return []
+  }
+}
+
+export async function getUsuario(id: string): Promise<Usuario | null> {
+  const firestore = getDb()
+  if (!firestore) return null
+
+  try {
+    console.log(`Obteniendo usuario con ID: ${id}`)
+    const docRef = doc(firestore, "usuarios", id)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as Usuario
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error al obtener usuario:", error)
+    return null
+  }
+}
+
+export async function getUsuarioByEmail(email: string): Promise<Usuario | null> {
+  const firestore = getDb()
+  if (!firestore) return null
+
+  try {
+    console.log(`Buscando usuario con email: ${email}`)
+    const usuariosRef = collection(firestore, "usuarios")
+    const q = query(usuariosRef, where("email", "==", email))
+    const snapshot = await getDocs(q)
+
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0]
+      return {
+        id: doc.id,
+        ...doc.data(),
+      } as Usuario
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error al buscar usuario por email:", error)
+    return null
+  }
+}
+
+export async function crearUsuario(usuario: Omit<Usuario, "id" | "createdAt">): Promise<string> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log("Creando nuevo usuario...")
+
+    // Verificar si ya existe un usuario con ese email
+    const usuarioExistente = await getUsuarioByEmail(usuario.email)
+    if (usuarioExistente) {
+      throw new Error(`Ya existe un usuario con el email ${usuario.email}`)
+    }
+
+    const usuarioData = {
+      ...usuario,
+      createdAt: serverTimestamp(),
+    }
+
+    const docRef = await addDoc(collection(firestore, "usuarios"), usuarioData)
+    console.log(`Usuario creado con ID: ${docRef.id}`)
+    return docRef.id
+  } catch (error) {
+    console.error("Error al crear usuario:", error)
+    throw error
+  }
+}
+
+export async function actualizarUsuario(
+  id: string,
+  usuario: Partial<Omit<Usuario, "id" | "createdAt">>,
+): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Actualizando usuario con ID: ${id}`)
+    const docRef = doc(firestore, "usuarios", id)
+
+    // Añadir timestamp de actualización
+    const dataToUpdate = {
+      ...usuario,
+      updatedAt: serverTimestamp(),
+    }
+
+    await updateDoc(docRef, dataToUpdate)
+    console.log("Usuario actualizado correctamente")
+  } catch (error) {
+    console.error("Error al actualizar usuario:", error)
+    throw error
+  }
+}
+
+export async function eliminarUsuario(id: string): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Eliminando usuario con ID: ${id}`)
+    const docRef = doc(firestore, "usuarios", id)
+    await deleteDoc(docRef)
+    console.log("Usuario eliminado correctamente")
+  } catch (error) {
+    console.error("Error al eliminar usuario:", error)
+    throw error
+  }
+}
+
+// Funciones para asignar kinesiólogo a paciente
+export async function asignarKinesiologoAPaciente(
+  pacienteId: string,
+  kinesiologoId: string,
+  kinesiologoNombre: string,
+): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Asignando kinesiólogo ${kinesiologoId} al paciente ${pacienteId}`)
+    const docRef = doc(firestore, "pacientes", pacienteId)
+
+    await updateDoc(docRef, {
+      kinesiologo_id: kinesiologoId,
+      kinesiologo_nombre: kinesiologoNombre,
+      updatedAt: serverTimestamp(),
+    })
+
+    console.log("Kinesiólogo asignado correctamente")
+  } catch (error) {
+    console.error("Error al asignar kinesiólogo:", error)
+    throw error
+  }
+}
+
+// Modificar la función getPacientes para filtrar por kinesiólogo
+export async function getPacientesPorKinesiologo(kinesiologoId: string): Promise<Paciente[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`Obteniendo pacientes del kinesiólogo ${kinesiologoId}...`)
+    const pacientesRef = collection(firestore, "pacientes")
+    const q = query(pacientesRef, where("kinesiologo_id", "==", kinesiologoId))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Paciente[]
+  } catch (error) {
+    console.error(`Error al obtener pacientes del kinesiólogo ${kinesiologoId}:`, error)
+    return []
+  }
+}
+
+// Modificar la función getPacientesActivos para filtrar por kinesiólogo si es necesario
+export async function getPacientesActivosPorKinesiologo(kinesiologoId: string): Promise<Paciente[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`Obteniendo pacientes activos del kinesiólogo ${kinesiologoId}...`)
+    const pacientesRef = collection(firestore, "pacientes")
+    const q = query(pacientesRef, where("activo", "==", true), where("kinesiologo_id", "==", kinesiologoId))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Paciente[]
+  } catch (error) {
+    console.error(`Error al obtener pacientes activos del kinesiólogo ${kinesiologoId}:`, error)
+    return []
   }
 }
 

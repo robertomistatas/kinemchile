@@ -23,12 +23,13 @@ import {
 } from "@/components/ui/alert-dialog"
 
 export default function PacientesPage() {
-  const { user, loading } = useAuth()
+  const { user, loading, userInfo } = useAuth()
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [pacienteAEliminar, setPacienteAEliminar] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -40,10 +41,20 @@ export default function PacientesPage() {
     async function fetchPacientes() {
       try {
         setDataLoading(true)
-        const data = await getPacientes()
+
+        let data
+        // Si el usuario es kinesiólogo, cargar solo sus pacientes
+        if (userInfo?.rol === "kinesiologo") {
+          data = await getPacientes(userInfo.id)
+        } else {
+          // Si es admin o recepcionista, cargar todos los pacientes
+          data = await getPacientes()
+        }
+
         setPacientes(data)
       } catch (error) {
         console.error("Error al cargar pacientes:", error)
+        setError("Error al cargar la lista de pacientes")
       } finally {
         setDataLoading(false)
       }
@@ -52,7 +63,7 @@ export default function PacientesPage() {
     if (user) {
       fetchPacientes()
     }
-  }, [user])
+  }, [user, userInfo])
 
   // Filtrar pacientes según el término de búsqueda
   const filteredPacientes = pacientes.filter(
