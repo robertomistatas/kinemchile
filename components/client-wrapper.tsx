@@ -1,13 +1,9 @@
 "use client"
 
-import type { ReactNode } from "react"
-import dynamic from "next/dynamic"
+import type React from "react"
 
-// Importar el AuthProvider de forma dinámica para que solo se cargue en el cliente
-const AuthProvider = dynamic(() => import("@/components/auth-provider"), {
-  ssr: false,
-})
+import { FirebaseAuthProvider } from "@/components/firebase-auth-provider"
 
-export function ClientWrapper({ children }: { children: ReactNode }) {
-  return <AuthProvider>{children}</AuthProvider>
+export function ClientWrapper({ children }: { children: React.ReactNode }) {
+  return <FirebaseAuthProvider>{children}</FirebaseAuthProvider>
 }

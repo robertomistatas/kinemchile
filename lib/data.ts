@@ -1,151 +1,143 @@
-// Tipos existentes
+// Tipos para la aplicación
 export interface Paciente {
-  id: string
+  id?: string
   nombre: string
   apellido: string
   rut: string
-  email: string
-  telefono: string
   fechaNacimiento: string
+  telefono: string
+  email: string
   direccion: string
-  diagnostico: string
-  diagnosticoMedico?: string
-  antecedentesPersonales: string
-  antecedentesClinicosRelevantes?: string
-  evaluacionInicial?: string
-  evaluacionFinal?: string
-  examenesAuxiliares?: string
-  fechaInicio?: string
-  fechaAlta?: string | null
-  notasAlta?: string | null
-  edad?: string
-  genero?: string
-  prevision?: string
-  oda?: string
-  patologias?: string[]
-  sesiones?: any[]
-  activo: boolean
-  createdAt: number
-  updatedAt?: number | null
-  // Nuevos campos para asignación de kinesiólogo
-  kinesiologo_id?: string | null
-  kinesiologo_nombre?: string | null
+  previsión?: string
+  diagnostico?: string
+  observaciones?: string
+  activo?: boolean
+  kinesiologoId?: string // ID del kinesiólogo asignado
+  kinesiologoEmail?: string // Email del kinesiólogo asignado
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Sesion {
-  id: string
+  id?: string
   pacienteId: string
-  paciente?: Paciente
-  fecha: number
-  tipo: string
-  descripcion: string
-  observaciones?: string
-  createdAt?: number
-  updatedAt?: number | null
+  fecha: string
+  hora: string
+  duracion: number
+  estado: string
+  notas: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Cita {
-  id: string
+  id?: string
   pacienteId: string
-  paciente?: Paciente
-  fecha: number
+  pacienteNombre?: string
+  fecha: string
   hora: string
   duracion: number
-  motivo: string
-  estado: "programada" | "completada" | "cancelada"
+  estado: string
   notas?: string
-  createdAt?: number
-  updatedAt?: number | null
+  createdAt?: string
+  updatedAt?: string
 }
 
-// Nuevos tipos para el sistema de roles
 export interface Usuario {
-  id: string
+  id?: string
   email: string
   nombre: string
-  rol: "admin" | "kinesiologo" | "recepcionista"
-  permisos: string[]
-  createdAt?: number
-  updatedAt?: number | null
+  rol: string
+  permisos?: string[]
+  activo?: boolean
+  createdAt?: string
+  updatedAt?: string
 }
 
-// Constantes para permisos
+// Roles del sistema
+export const ROLES = {
+  ADMIN: "admin",
+  KINESIOLOGO: "kinesiologo",
+  RECEPCIONISTA: "recepcionista",
+  USUARIO: "usuario",
+}
+
+// Permisos del sistema
 export const PERMISOS = {
-  ADMIN: {
-    ACCESO: "admin:acceso",
-    USUARIOS: "admin:usuarios",
-    ROLES: "admin:roles",
-  },
-  PACIENTES: {
-    VER_TODOS: "pacientes:ver_todos",
-    VER_ASIGNADOS: "pacientes:ver_asignados",
-    CREAR: "pacientes:crear",
-    EDITAR: "pacientes:editar",
-    ELIMINAR: "pacientes:eliminar",
-    ASIGNAR_KINESIOLOGO: "pacientes:asignar_kinesiologo",
-    DAR_ALTA: "pacientes:dar_alta",
-  },
-  SESIONES: {
-    VER: "sesiones:ver",
-    CREAR: "sesiones:crear",
-    EDITAR: "sesiones:editar",
-    ELIMINAR: "sesiones:eliminar",
-  },
-  CITAS: {
-    VER_TODAS: "citas:ver_todas",
-    VER_ASIGNADAS: "citas:ver_asignadas",
-    CREAR: "citas:crear",
-    EDITAR: "citas:editar",
-    ELIMINAR: "citas:eliminar",
-    CAMBIAR_ESTADO: "citas:cambiar_estado",
-  },
+  // Pacientes
+  VER_PACIENTES: "ver_pacientes",
+  VER_TODOS_PACIENTES: "ver_todos_pacientes",
+  CREAR_PACIENTE: "crear_paciente",
+  EDITAR_PACIENTE: "editar_paciente",
+  ELIMINAR_PACIENTE: "eliminar_paciente",
+  DAR_ALTA_PACIENTE: "dar_alta_paciente",
+
+  // Sesiones
+  VER_SESIONES: "ver_sesiones",
+  VER_TODAS_SESIONES: "ver_todas_sesiones",
+  CREAR_SESION: "crear_sesion",
+  EDITAR_SESION: "editar_sesion",
+  ELIMINAR_SESION: "eliminar_sesion",
+
+  // Citas
+  VER_CITAS: "ver_citas",
+  VER_TODAS_CITAS: "ver_todas_citas",
+  CREAR_CITA: "crear_cita",
+  EDITAR_CITA: "editar_cita",
+  ELIMINAR_CITA: "eliminar_cita",
+
+  // Usuarios
+  VER_USUARIOS: "ver_usuarios",
+  CREAR_USUARIO: "crear_usuario",
+  EDITAR_USUARIO: "editar_usuario",
+  ELIMINAR_USUARIO: "eliminar_usuario",
+
+  // Configuración
+  ACCESO_CONFIGURACION: "acceso_configuracion",
 }
 
-// Permisos predefinidos por rol
-export const PERMISOS_POR_ROL = {
-  admin: [
-    PERMISOS.ADMIN.ACCESO,
-    PERMISOS.ADMIN.USUARIOS,
-    PERMISOS.ADMIN.ROLES,
-    PERMISOS.PACIENTES.VER_TODOS,
-    PERMISOS.PACIENTES.VER_ASIGNADOS,
-    PERMISOS.PACIENTES.CREAR,
-    PERMISOS.PACIENTES.EDITAR,
-    PERMISOS.PACIENTES.ELIMINAR,
-    PERMISOS.PACIENTES.ASIGNAR_KINESIOLOGO,
-    PERMISOS.PACIENTES.DAR_ALTA,
-    PERMISOS.SESIONES.VER,
-    PERMISOS.SESIONES.CREAR,
-    PERMISOS.SESIONES.EDITAR,
-    PERMISOS.SESIONES.ELIMINAR,
-    PERMISOS.CITAS.VER_TODAS,
-    PERMISOS.CITAS.VER_ASIGNADAS,
-    PERMISOS.CITAS.CREAR,
-    PERMISOS.CITAS.EDITAR,
-    PERMISOS.CITAS.ELIMINAR,
-    PERMISOS.CITAS.CAMBIAR_ESTADO,
+// Permisos por rol
+export const PERMISOS_POR_ROL: Record<string, string[]> = {
+  [ROLES.ADMIN]: Object.values(PERMISOS),
+  [ROLES.KINESIOLOGO]: [
+    PERMISOS.VER_PACIENTES,
+    PERMISOS.CREAR_PACIENTE,
+    PERMISOS.EDITAR_PACIENTE,
+    PERMISOS.DAR_ALTA_PACIENTE,
+    PERMISOS.VER_SESIONES,
+    PERMISOS.CREAR_SESION,
+    PERMISOS.EDITAR_SESION,
+    PERMISOS.VER_CITAS,
+    PERMISOS.CREAR_CITA,
+    PERMISOS.EDITAR_CITA,
+    PERMISOS.ELIMINAR_CITA,
   ],
-  kinesiologo: [
-    PERMISOS.PACIENTES.VER_ASIGNADOS,
-    PERMISOS.PACIENTES.EDITAR,
-    PERMISOS.PACIENTES.DAR_ALTA,
-    PERMISOS.SESIONES.VER,
-    PERMISOS.SESIONES.CREAR,
-    PERMISOS.SESIONES.EDITAR,
-    PERMISOS.CITAS.VER_ASIGNADAS,
-    PERMISOS.CITAS.CREAR,
-    PERMISOS.CITAS.EDITAR,
-    PERMISOS.CITAS.CAMBIAR_ESTADO,
+  [ROLES.RECEPCIONISTA]: [
+    PERMISOS.VER_PACIENTES,
+    PERMISOS.CREAR_PACIENTE,
+    PERMISOS.EDITAR_PACIENTE,
+    PERMISOS.VER_CITAS,
+    PERMISOS.CREAR_CITA,
+    PERMISOS.EDITAR_CITA,
+    PERMISOS.ELIMINAR_CITA,
   ],
-  recepcionista: [
-    PERMISOS.PACIENTES.VER_TODOS,
-    PERMISOS.PACIENTES.CREAR,
-    PERMISOS.CITAS.VER_TODAS,
-    PERMISOS.CITAS.CREAR,
-    PERMISOS.CITAS.EDITAR,
-    PERMISOS.CITAS.CAMBIAR_ESTADO,
-  ],
+  [ROLES.USUARIO]: [PERMISOS.VER_PACIENTES, PERMISOS.VER_CITAS],
 }
 
-// Lista de todos los permisos para referencia
-export const LISTA_PERMISOS = Object.values(PERMISOS).flatMap((categoria) => Object.values(categoria))
+// Estados de las citas
+export const ESTADOS_CITA = {
+  PENDIENTE: "pendiente",
+  CONFIRMADA: "confirmada",
+  COMPLETADA: "completada",
+  CANCELADA: "cancelada",
+  NO_ASISTIO: "no_asistio",
+}
+
+// Colores para los estados de las citas
+export const COLORES_ESTADO_CITA: Record<string, string> = {
+  [ESTADOS_CITA.PENDIENTE]: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  [ESTADOS_CITA.CONFIRMADA]: "bg-blue-100 text-blue-800 border-blue-300",
+  [ESTADOS_CITA.COMPLETADA]: "bg-green-100 text-green-800 border-green-300",
+  [ESTADOS_CITA.CANCELADA]: "bg-red-100 text-red-800 border-red-300",
+  [ESTADOS_CITA.NO_ASISTIO]: "bg-gray-100 text-gray-800 border-gray-300",
+}

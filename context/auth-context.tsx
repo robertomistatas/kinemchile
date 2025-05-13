@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth"
+import { useRouter } from "next/navigation"
+import { signInWithEmailAndPassword, signOut, type User } from "firebase/auth"
 import { initFirebase } from "@/lib/firebase"
 import { getUsuarioByEmail } from "@/lib/firestore-service"
 import type { Usuario } from "@/lib/data"
@@ -17,51 +18,69 @@ interface AuthContextType {
   logout: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+// Valor por defecto para el contexto
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  userInfo: null,
+  userPermisos: [],
+  loading: true,
+  error: null,
+  login: async () => {},
+  logout: async () => {},
+})
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+export function useAuth() {
+  return useContext(AuthContext)
+}
+
+interface AuthProviderProps {
+  children: ReactNode
+  user: User | null
+  loading: boolean
+  error: string | null
+}
+
+export function AuthProvider({ children, user, loading: initialLoading, error: initialError }: AuthProviderProps) {
   const [userInfo, setUserInfo] = useState<Usuario | null>(null)
   const [userPermisos, setUserPermisos] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(initialLoading)
+  const [error, setError] = useState<string | null>(initialError)
+  const router = useRouter()
 
   useEffect(() => {
-    const { auth } = initFirebase()
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user)
-
-      if (user) {
-        try {
-          // Obtener información del usuario desde Firestore
-          const userDoc = await getUsuarioByEmail(user.email || "")
-          setUserInfo(userDoc)
-
-          // Establecer permisos
-          if (userDoc?.permisos) {
-            setUserPermisos(userDoc.permisos)
-          } else if (userDoc?.rol) {
-            // Si no hay permisos específicos, usar los predefinidos para el rol
-            setUserPermisos(PERMISOS_POR_ROL[userDoc.rol] || [])
-          } else {
-            setUserPermisos([])
-          }
-        } catch (error) {
-          console.error("Error al obtener información del usuario:", error)
-          setUserInfo(null)
-          setUserPermisos([])
-        }
-      } else {
+    async function loadUserInfo() {
+      if (!user) {
         setUserInfo(null)
         setUserPermisos([])
+        setLoading(false)
+        return
       }
 
-      setLoading(false)
-    })
+      try {
+        // Cargar información del usuario desde Firestore
+        const userInfoFromDb = await getUsuarioByEmail(user.email || "")
+        setUserInfo(userInfoFromDb)
 
-    return () => unsubscribe()
-  }, [])
+        // Establecer permisos
+        if (userInfoFromDb?.permisos) {
+          setUserPermisos(userInfoFromDb.permisos)
+        } else if (userInfoFromDb?.rol) {
+          // Si no hay permisos específicos, usar los predefinidos para el rol
+          setUserPermisos(PERMISOS_POR_ROL[userInfoFromDb.rol] || [])
+        } else {
+          setUserPermisos([])
+        }
+      } catch (err) {
+        console.error("Error al cargar información del usuario:", err)
+        setError("Error al cargar información del usuario")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    setLoading(true)
+    loadUserInfo()
+  }, [user])
 
   const login = async (email: string, password: string) => {
     setLoading(true)
@@ -70,23 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { auth } = initFirebase()
       await signInWithEmailAndPassword(auth, email, password)
-
-      // Obtener información del usuario desde Firestore
-      const userDoc = await getUsuarioByEmail(email)
-      setUserInfo(userDoc)
-
-      // Establecer permisos
-      if (userDoc?.permisos) {
-        setUserPermisos(userDoc.permisos)
-      } else if (userDoc?.rol) {
-        // Si no hay permisos específicos, usar los predefinidos para el rol
-        setUserPermisos(PERMISOS_POR_ROL[userDoc.rol] || [])
-      } else {
-        setUserPermisos([])
-      }
+      router.push("/dashboard")
     } catch (error) {
       console.error("Error al iniciar sesión:", error)
       setError("Credenciales inválidas. Por favor, verifica tu email y contraseña.")
+      throw error
     } finally {
       setLoading(false)
     }
@@ -99,25 +106,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { auth } = initFirebase()
       await signOut(auth)
+      router.push("/login")
     } catch (error) {
       console.error("Error al cerrar sesión:", error)
       setError("Error al cerrar sesión. Por favor, intenta de nuevo.")
+      throw error
     } finally {
       setLoading(false)
     }
   }
 
-  return (
-    <AuthContext.Provider value={{ user, userInfo, userPermisos, loading, error, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth debe ser usado dentro de un AuthProvider")
+  const value = {
+    user,
+    userInfo,
+    userPermisos,
+    loading: initialLoading || loading,
+    error: initialError || error,
+    login,
+    logout,
   }
-  return context
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
