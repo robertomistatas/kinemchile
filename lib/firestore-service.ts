@@ -1070,3 +1070,94 @@ export async function debugCitas() {
     return []
   }
 }
+
+// Añadir estas funciones para manejar la asignación de tratante
+
+export async function asignarTratanteAPaciente(
+  pacienteId: string,
+  tratanteId: string,
+  tratanteNombre: string,
+  tratanteFuncion: string,
+): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`Asignando tratante ${tratanteId} al paciente ${pacienteId}`)
+    const docRef = doc(firestore, "pacientes", pacienteId)
+
+    await updateDoc(docRef, {
+      tratante_id: tratanteId,
+      tratante_nombre: tratanteNombre,
+      tratante_funcion: tratanteFuncion,
+      updatedAt: serverTimestamp(),
+    })
+
+    console.log("Tratante asignado correctamente")
+  } catch (error) {
+    console.error("Error al asignar tratante:", error)
+    throw error
+  }
+}
+
+export async function getProfesionalesPorFuncion(funcion: string): Promise<Usuario[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`Obteniendo profesionales con función ${funcion}...`)
+    const usuariosRef = collection(firestore, "usuarios")
+    const q = query(usuariosRef, where("funcion", "==", funcion))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Usuario[]
+  } catch (error) {
+    console.error(`Error al obtener profesionales con función ${funcion}:`, error)
+    return []
+  }
+}
+
+export async function getProfesionales(): Promise<Usuario[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log("Obteniendo profesionales (kinesiólogos y médicos)...")
+    const usuariosRef = collection(firestore, "usuarios")
+    const q = query(usuariosRef, where("funcion", "in", ["kinesiologa", "medico"]))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Usuario[]
+  } catch (error) {
+    // Si falla la consulta con "in", intentamos con consultas separadas
+    try {
+      console.log("Intentando obtener profesionales con consultas separadas...")
+      const usuariosRef = collection(firestore, "usuarios")
+
+      const kinesiologasSnapshot = await getDocs(query(usuariosRef, where("funcion", "==", "kinesiologa")))
+
+      const medicosSnapshot = await getDocs(query(usuariosRef, where("funcion", "==", "medico")))
+
+      const kinesiologas = kinesiologasSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+
+      const medicos = medicosSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
+
+      return [...kinesiologas, ...medicos] as Usuario[]
+    } catch (secondError) {
+      console.error("Error al obtener profesionales:", secondError)
+      return []
+    }
+  }
+}

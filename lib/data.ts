@@ -8,12 +8,13 @@ export interface Paciente {
   telefono: string
   email: string
   direccion: string
-  previsión?: string
+  prevision?: string
   diagnostico?: string
   observaciones?: string
   activo?: boolean
-  kinesiologoId?: string // ID del kinesiólogo asignado
-  kinesiologoEmail?: string // Email del kinesiólogo asignado
+  tratante_id?: string // ID del profesional tratante
+  tratante_nombre?: string // Nombre del profesional tratante
+  tratante_funcion?: string // Función del profesional tratante (kinesiologa, medico)
   createdAt?: string
   updatedAt?: string
 }
@@ -47,6 +48,9 @@ export interface Usuario {
   id?: string
   email: string
   nombre: string
+  rut?: string
+  telefono?: string
+  funcion?: string // kinesiologa, medico, administrativo
   rol: string
   permisos?: string[]
   activo?: boolean
@@ -140,4 +144,11 @@ export const COLORES_ESTADO_CITA: Record<string, string> = {
   [ESTADOS_CITA.COMPLETADA]: "bg-green-100 text-green-800 border-green-300",
   [ESTADOS_CITA.CANCELADA]: "bg-red-100 text-red-800 border-red-300",
   [ESTADOS_CITA.NO_ASISTIO]: "bg-gray-100 text-gray-800 border-gray-300",
+}
+
+// Funciones de los profesionales
+export const FUNCIONES = {
+  KINESIOLOGA: "kinesiologa",
+  MEDICO: "medico",
+  ADMINISTRATIVO: "administrativo",
 }

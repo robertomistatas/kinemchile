@@ -17,10 +17,15 @@ import { crearPaciente } from "@/lib/firestore"
 import Link from "next/link"
 import { validarRut, formatearRut } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+// Añadir estas importaciones
+import { getProfesionales } from "@/lib/firestore-service"
 
 export default function NuevoPacientePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  // Dentro del componente NuevoPacientePage, añadir este estado
+  const [profesionales, setProfesionales] = useState([])
+  // Actualizar el estado formData para incluir el tratante
   const [formData, setFormData] = useState({
     nombre: "",
     apellido: "",
@@ -36,10 +41,27 @@ export default function NuevoPacientePage() {
     edad: "",
     genero: "",
     prevision: "",
+    tratante_id: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [generalError, setGeneralError] = useState("")
+
+  // Añadir este useEffect para cargar los profesionales
+  useEffect(() => {
+    async function fetchProfesionales() {
+      try {
+        const profesionalesData = await getProfesionales()
+        setProfesionales(profesionalesData)
+      } catch (error) {
+        console.error("Error al cargar profesionales:", error)
+      }
+    }
+
+    if (user) {
+      fetchProfesionales()
+    }
+  }, [user])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -97,6 +119,7 @@ export default function NuevoPacientePage() {
     return Object.keys(newErrors).length === 0
   }
 
+  // Actualizar la función handleSubmit para incluir el tratante
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -108,6 +131,9 @@ export default function NuevoPacientePage() {
     setGeneralError("")
 
     try {
+      // Encontrar el profesional seleccionado
+      const profesionalSeleccionado = profesionales.find((p) => p.id === formData.tratante_id)
+
       const pacienteId = await crearPaciente({
         nombre: formData.nombre,
         apellido: formData.apellido,
@@ -123,6 +149,9 @@ export default function NuevoPacientePage() {
         edad: formData.edad,
         genero: formData.genero,
         prevision: formData.prevision,
+        tratante_id: formData.tratante_id,
+        tratante_nombre: profesionalSeleccionado ? profesionalSeleccionado.nombre : "",
+        tratante_funcion: profesionalSeleccionado ? profesionalSeleccionado.funcion : "",
       })
 
       router.push(`/pacientes/${pacienteId}`)
@@ -270,6 +299,32 @@ export default function NuevoPacientePage() {
                         <SelectItem value="Particular">Particular</SelectItem>
                         <SelectItem value="Fonasa">Fonasa</SelectItem>
                         <SelectItem value="Isapre">Isapre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  // En la sección de información personal, añadir este bloque
+                  <div className="space-y-2">
+                    <Label htmlFor="tratante">Profesional Tratante</Label>
+                    <Select
+                      value={formData.tratante_id}
+                      onValueChange={(value) => handleSelectChange("tratante_id", value)}
+                    >
+                      <SelectTrigger id="tratante">
+                        <SelectValue placeholder="Seleccionar profesional" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="no_asignado">Sin asignar</SelectItem>
+                        {profesionales.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.nombre} (
+                            {p.funcion === "kinesiologa"
+                              ? "Kinesióloga"
+                              : p.funcion === "medico"
+                                ? "Médico"
+                                : p.funcion}
+                            )
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

@@ -37,6 +37,9 @@ import { PermissionGate } from "@/components/permission-gate"
 import { DebugSesiones } from "@/components/debug-sesiones"
 import { DebugPaciente } from "@/components/debug-paciente"
 
+// Añadir estas importaciones
+import { asignarTratanteAPaciente, getProfesionales } from "@/lib/firestore-service"
+
 export default function PacienteDetallePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -56,8 +59,14 @@ export default function PacienteDetallePage() {
   const [kinesiolocos, setKinesiologos] = useState([])
   const [asignandoKinesiologo, setAsignandoKinesiologo] = useState(false)
 
-  // Añadir este estado para mensajes de éxito
+  // Dentro del componente PacienteDetallePage, añadir estos estados
+  const [tratante, setTratante] = useState("")
+  const [profesionales, setProfesionales] = useState([])
+  const [asignandoTratante, setAsignandoTratante] = useState(false)
   const [success, setSuccess] = useState("")
+
+  // Añadir este estado para mensajes de éxito
+  // const [success, setSuccess] = useState("")
 
   useEffect(() => {
     if (!loading && !user) {
@@ -141,6 +150,27 @@ export default function PacienteDetallePage() {
     }
   }, [user, paciente])
 
+  // Añadir este useEffect para cargar los profesionales
+  useEffect(() => {
+    async function fetchProfesionales() {
+      try {
+        const profesionalesData = await getProfesionales()
+        setProfesionales(profesionalesData)
+
+        // Si el paciente tiene un tratante asignado, seleccionarlo
+        if (paciente?.tratante_id) {
+          setTratante(paciente.tratante_id)
+        }
+      } catch (error) {
+        console.error("Error al cargar profesionales:", error)
+      }
+    }
+
+    if (user && paciente) {
+      fetchProfesionales()
+    }
+  }, [user, paciente])
+
   // Añadir esta función para manejar la asignación de kinesiólogo
   const handleAsignarKinesiologo = async () => {
     if (!kinesiologo) return
@@ -172,6 +202,39 @@ export default function PacienteDetallePage() {
     }
   }
 
+  // Añadir esta función para manejar la asignación de tratante
+  const handleAsignarTratante = async () => {
+    if (!tratante) return
+
+    try {
+      setAsignandoTratante(true)
+
+      // Encontrar el profesional seleccionado
+      const profesionalSeleccionado = profesionales.find((p) => p.id === tratante)
+      const profesionalNombre = profesionalSeleccionado ? profesionalSeleccionado.nombre : ""
+      const profesionalFuncion = profesionalSeleccionado ? profesionalSeleccionado.funcion : ""
+
+      await asignarTratanteAPaciente(id, tratante, profesionalNombre, profesionalFuncion)
+
+      // Actualizar el paciente en el estado local
+      setPaciente({
+        ...paciente,
+        tratante_id: tratante,
+        tratante_nombre: profesionalNombre,
+        tratante_funcion: profesionalFuncion,
+      })
+
+      // Mostrar mensaje de éxito
+      setSuccess("Profesional asignado correctamente")
+      setTimeout(() => setSuccess(""), 3000)
+    } catch (error) {
+      console.error("Error al asignar profesional:", error)
+      setError("Error al asignar profesional. Por favor, intenta nuevamente.")
+    } finally {
+      setAsignandoTratante(false)
+    }
+  }
+
   const handleRefresh = () => {
     setRefreshing(true)
     fetchData()
@@ -186,9 +249,19 @@ export default function PacienteDetallePage() {
 
     const doc = new jsPDF()
 
+    // Añadir logo
+    doc.addImage(
+      "https://static.wixstatic.com/media/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png/v1/crop/x_0,y_0,w_920,h_343/fill/w_171,h_63,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png",
+      "PNG",
+      20,
+      10,
+      40,
+      15,
+    )
+
     // Título
     doc.setFontSize(20)
-    doc.text("Ficha Clínica", 105, 15, { align: "center" })
+    doc.text("Ficha Clínica", 105, 20, { align: "center" })
 
     // Información del paciente
     doc.setFontSize(12)
@@ -456,8 +529,18 @@ export default function PacienteDetallePage() {
 
         {/* Título para impresión */}
         <div className="hidden print:block print:mb-6">
-          <h1 className="text-3xl font-bold text-center">Ficha Clínica</h1>
-          <p className="text-center text-gray-500">Kinem Chile</p>
+          <div className="flex items-center justify-between">
+            <img
+              src="https://static.wixstatic.com/media/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png/v1/crop/x_0,y_0,w_920,h_343/fill/w_171,h_63,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png"
+              alt="Kinem Chile Logo"
+              className="h-16"
+            />
+            <div>
+              <h1 className="text-3xl font-bold text-center">Ficha Clínica</h1>
+              <p className="text-center text-gray-500">Kinem Chile</p>
+            </div>
+            <div className="w-[171px]"></div> {/* Espacio para equilibrar el diseño */}
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="print:mt-8">
@@ -793,6 +876,54 @@ export default function PacienteDetallePage() {
                         {success && <p className="text-sm text-green-600">{success}</p>}
                       </div>
                     </PermissionGate>
+                    {/* Sección de asignación de tratante */}
+                    <div className="space-y-2 mt-4">
+                      <Label htmlFor="tratante">Profesional Tratante</Label>
+                      <div className="flex gap-2">
+                        <Select value={tratante} onValueChange={setTratante} disabled={asignandoTratante}>
+                          <SelectTrigger id="tratante" className="flex-1">
+                            <SelectValue placeholder="Seleccionar profesional" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="no-asignado">Sin asignar</SelectItem>
+                            {profesionales.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.nombre} (
+                                {p.funcion === "kinesiologa"
+                                  ? "Kinesióloga"
+                                  : p.funcion === "medico"
+                                    ? "Médico"
+                                    : p.funcion}
+                                )
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          onClick={handleAsignarTratante}
+                          disabled={tratante === (paciente?.tratante_id || "") || asignandoTratante}
+                        >
+                          {asignandoTratante ? "Guardando..." : "Guardar"}
+                        </Button>
+                      </div>
+                      {paciente?.tratante_nombre && (
+                        <p className="text-sm text-muted-foreground">
+                          Actualmente asignado a: <span className="font-medium">{paciente.tratante_nombre}</span>
+                          {paciente.tratante_funcion && (
+                            <span className="ml-1">
+                              (
+                              {paciente.tratante_funcion === "kinesiologa"
+                                ? "Kinesióloga"
+                                : paciente.tratante_funcion === "medico"
+                                  ? "Médico"
+                                  : paciente.tratante_funcion}
+                              )
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      {success && <p className="text-sm text-green-600">{success}</p>}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
