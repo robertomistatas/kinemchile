@@ -572,9 +572,14 @@ export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
 
     console.log(`Buscando citas entre: ${new Date(inicioTimestamp).toLocaleString()} y ${new Date(finTimestamp).toLocaleString()}`)
     console.log(`Timestamps: inicio=${inicioTimestamp}, fin=${finTimestamp}`)
-
-    // Primero intentemos buscar por timestamp (número)
-    const citasRef = collection(firestore, "citas")
+    
+    // Convertir también a string en formato ISO para posibles comparaciones
+    const fechaISOString = fecha.toISOString().split('T')[0]; // formato YYYY-MM-DD
+    console.log(`Fecha ISO para comparación: ${fechaISOString}`);
+    
+    // Primero intentemos buscar por timestamp (número)    const citasRef = collection(firestore, "citas")
+    
+    // Consulta principal por rango de timestamp
     const q = query(
       citasRef,
       where("fecha", ">=", inicioTimestamp),
@@ -583,11 +588,60 @@ export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
     )
 
     const snapshot = await getDocs(q)
-    console.log(`Se encontraron ${snapshot.docs.length} citas para la fecha ${fecha.toLocaleDateString()}`)
-
-    // Procesar los resultados y convertir campos según sea necesario
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
+    console.log(`Se encontraron ${snapshot.docs.length} citas por timestamp para la fecha ${fecha.toLocaleDateString()}`)
+    
+    // Si no encontramos citas con la consulta de timestamp, intentemos obtener todas las citas
+    // y filtrarlas manualmente para detectar posibles problemas de formato
+    let todasLasCitas: any[] = [];
+    if (snapshot.docs.length === 0) {
+      console.log("No se encontraron citas con consulta por timestamp, buscando todas las citas...");
+      const qTodas = query(citasRef);
+      const snapshotTodas = await getDocs(qTodas);
+      
+      // Filtramos manualmente las citas que corresponden a la fecha seleccionada
+      todasLasCitas = snapshotTodas.docs
+        .map(doc => ({id: doc.id, ...doc.data()}))
+        .filter(cita => {
+          // Si la fecha está como string, convertimos a Date para comparar
+          if (typeof cita.fecha === 'string') {
+            const fechaCita = new Date(cita.fecha);
+            return fechaCita >= inicioDelDia && fechaCita <= finDelDia;
+          }
+          // Si es un número, comparamos directamente
+          else if (typeof cita.fecha === 'number') {
+            return cita.fecha >= inicioTimestamp && cita.fecha <= finTimestamp;
+          }
+          // Si tiene formato Firestore timestamp
+          else if (cita.fecha && typeof cita.fecha === 'object' && cita.fecha.toDate) {
+            const fechaTimestamp = cita.fecha.toDate().getTime();
+            return fechaTimestamp >= inicioTimestamp && fechaTimestamp <= finTimestamp;
+          }
+          return false;
+        });
+        
+      console.log(`Se encontraron ${todasLasCitas.length} citas adicionales por filtrado manual`);
+    }
+    
+    // Combinar resultados (evitando duplicados por ID)
+    const citasCombinadas = [...snapshot.docs];
+    const idsExistentes = new Set(snapshot.docs.map(doc => doc.id));
+    
+    // Añadir las encontradas manualmente sin duplicar
+    todasLasCitas.forEach(cita => {
+      if (!idsExistentes.has(cita.id)) {
+        // Crear un documento similar al que devolvería Firestore
+        citasCombinadas.push({
+          id: cita.id,
+          data: () => cita,
+          exists: () => true
+        });
+      }
+    });
+    
+    console.log(`Total combinado: ${citasCombinadas.length} citas para la fecha ${fecha.toLocaleDateString()}`)    // Procesar los resultados y convertir campos según sea necesario
+    return citasCombinadas.map((doc) => {
+      // Si es un documento de Firestore, obtener los datos
+      const data = doc.data ? doc.data() : doc;
       
       // Normalizar la fecha (asegurarse que sea timestamp)
       let fechaNormalizada = data.fecha;
@@ -597,6 +651,8 @@ export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
         } else if (data.fecha.seconds) {
           fechaNormalizada = data.fecha.seconds * 1000;
         }
+      } else if (typeof data.fecha === "string") {
+        fechaNormalizada = new Date(data.fecha).getTime();
       }
       
       // Asegurar que exista una duración predeterminada
@@ -608,16 +664,20 @@ export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
       // Crear el objeto cita con datos normalizados
       return {
         id: doc.id,
-        ...data,
+        pacienteId: data.pacienteId || "",
         fecha: fechaNormalizada,
+        hora: data.hora || "",
         duracion: duracion,
         estado: estado,
+        motivo: data.motivo || "",
+        prevision: data.prevision || "",
+        createdAt: data.createdAt || Date.now(),
         // Añadir campos que podrían faltar para garantizar compatibilidad con la interfaz
         paciente: data.paciente || { 
-          id: data.pacienteId,
+          id: data.pacienteId || "",
           nombre: data.pacienteNombre || "Sin nombre",
-          apellido: "",
-          rut: ""
+          apellido: data.pacienteApellido || "",
+          rut: data.pacienteRut || ""
         }
       } as Cita;
     });
@@ -700,13 +760,19 @@ export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "updatedAt
     // Asegurarse de que la fecha sea un timestamp numérico
     let fechaTimestamp: number;
     if (typeof cita.fecha === "string") {
+      // Convertir string a número
       fechaTimestamp = new Date(cita.fecha).getTime();
       console.log(`Convertir fecha string a timestamp: ${cita.fecha} -> ${fechaTimestamp}`);
     } else if (typeof cita.fecha === "number") {
+      // Ya es un timestamp numérico
       fechaTimestamp = cita.fecha;
       console.log(`Fecha ya es timestamp numérico: ${fechaTimestamp}`);
+    } else if (cita.fecha instanceof Date) {
+      // Si es un objeto Date
+      fechaTimestamp = cita.fecha.getTime();
+      console.log(`Convertir objeto Date a timestamp: ${fechaTimestamp}`);
     } else {
-      // Si es objeto Date o algo inesperado
+      // Si es algo inesperado, usar fecha actual
       fechaTimestamp = new Date().getTime();
       console.log(`Fecha en formato desconocido, usando timestamp actual: ${fechaTimestamp}`);
     }

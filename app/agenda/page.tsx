@@ -163,10 +163,9 @@ export default function AgendaPage() {
       } finally {
         setCitasLoading(false)
       }
-    }
-
-    if (user && date) {
-      fetchCitas()
+    }    if (user && date) {
+      console.log("Actualizando citas - refreshCounter:", refreshCitas);
+      fetchCitas();
     }
   }, [user, date, refreshCitas]) // Añadido refreshCitas para forzar recarga
 
@@ -359,8 +358,8 @@ export default function AgendaPage() {
                 } as Cita
               : c,
           ),
-        )      } else {
-        // Crear nueva cita - siempre mantener fecha como timestamp (número)
+        )      } else {        // Crear nueva cita - siempre mantener fecha como timestamp (número)
+        console.log("Enviando fecha a la BD como:", typeof citaData.fecha, citaData.fecha);
         const citaId = await crearCita({
           ...citaData,
           // Asegurarnos que la fecha se guarde como timestamp para consistencia en la BD
@@ -443,12 +442,14 @@ export default function AgendaPage() {
       setError("Error al eliminar la cita. Por favor, intenta nuevamente.")
     }
   }
+  
   const handleCambiarEstadoCita = async (id: string | undefined, nuevoEstado: "programada" | "completada" | "cancelada") => {
     if (!id) {
       console.error("No se proporcionó un ID de cita válido");
       return;
     }
     try {
+      console.log(`Cambiando estado de cita ${id} a ${nuevoEstado}`);
       await cambiarEstadoCita(id, nuevoEstado)
 
       // Actualizar el estado en la lista local inmediatamente para UI responsiva
