@@ -130,7 +130,9 @@ export default function AgendaPage() {
     if (user) {
       fetchPacientes()
     }
-  }, [user])
+  }, [user])  // Estado para forzar la recarga de citas
+  const [refreshCitas, setRefreshCitas] = useState(0);
+
   // Cargar citas para la fecha seleccionada
   useEffect(() => {
     async function fetchCitas() {
@@ -138,6 +140,8 @@ export default function AgendaPage() {
 
       try {
         setCitasLoading(true)
+        console.log("Solicitando citas para la fecha:", date.toLocaleDateString());
+        
         const citasData = await getCitasPorFecha(date)
         console.log(`Citas cargadas para ${date.toLocaleDateString()}:`, citasData.length)
         
@@ -145,10 +149,12 @@ export default function AgendaPage() {
           console.log("Ejemplo de cita cargada:", {
             id: citasData[0].id,
             pacienteId: citasData[0].pacienteId,
-            fecha: new Date(citasData[0].fecha).toLocaleString(),
+            fecha: new Date(Number(citasData[0].fecha)).toLocaleString(),
             hora: citasData[0].hora,
             estado: citasData[0].estado
           });
+        } else {
+          console.log("No se encontraron citas para esta fecha");
         }
         
         setCitas(citasData)
@@ -162,7 +168,7 @@ export default function AgendaPage() {
     if (user && date) {
       fetchCitas()
     }
-  }, [user, date])
+  }, [user, date, refreshCitas]) // Añadido refreshCitas para forzar recarga
 
   useEffect(() => {
     async function fetchPacienteSeleccionado() {
@@ -353,13 +359,12 @@ export default function AgendaPage() {
                 } as Cita
               : c,
           ),
-        )
-      } else {
-        // Crear nueva cita
+        )      } else {
+        // Crear nueva cita - siempre mantener fecha como timestamp (número)
         const citaId = await crearCita({
           ...citaData,
-          // Convertir fecha de número a string si es necesario según el modelo de datos
-          fecha: citaData.fecha.toString()
+          // Asegurarnos que la fecha se guarde como timestamp para consistencia en la BD
+          fecha: citaData.fecha
         })
 
         // Siempre añadir la cita a la lista si estamos en la fecha correcta
@@ -380,9 +385,10 @@ export default function AgendaPage() {
         } else {
           console.log("La fecha de la cita no coincide con la fecha seleccionada. No se muestra en la lista actual.")
         }
-      }
+      }      setSuccess(true)
 
-      setSuccess(true)
+      // Forzar una recarga de las citas para asegurarnos de que se muestra la lista actualizada
+      setRefreshCitas(prev => prev + 1)
 
       // Esperar 1.5 segundos antes de cerrar el diálogo
       setTimeout(() => {
@@ -413,6 +419,7 @@ export default function AgendaPage() {
     setActiveTab("paciente-existente")
     setShowNuevaCita(true)
   }
+  
   const handleEliminarCita = async (id: string | null) => {
     if (!id) {
       console.error("No se proporcionó un ID de cita válido");
@@ -422,14 +429,20 @@ export default function AgendaPage() {
     
     try {
       await eliminarCita(id)
+      
+      // Actualizar la lista local inmediatamente
       setCitas(citas.filter((c) => c.id !== id))
       setConfirmDelete(null)
+      
+      // Forzar una recarga de citas para sincronizar con la BD
+      setTimeout(() => {
+        setRefreshCitas(prev => prev + 1);
+      }, 500);
     } catch (error) {
       console.error("Error al eliminar cita:", error)
       setError("Error al eliminar la cita. Por favor, intenta nuevamente.")
     }
   }
-
   const handleCambiarEstadoCita = async (id: string | undefined, nuevoEstado: "programada" | "completada" | "cancelada") => {
     if (!id) {
       console.error("No se proporcionó un ID de cita válido");
@@ -438,8 +451,13 @@ export default function AgendaPage() {
     try {
       await cambiarEstadoCita(id, nuevoEstado)
 
-      // Actualizar el estado en la lista local
+      // Actualizar el estado en la lista local inmediatamente para UI responsiva
       setCitas(citas.map((cita) => (cita.id === id ? { ...cita, estado: nuevoEstado, updatedAt: Date.now() } : cita)))
+      
+      // Forzar una recarga de citas después de un breve retraso para asegurar sincronización con la BD
+      setTimeout(() => {
+        setRefreshCitas(prev => prev + 1);
+      }, 500);
     } catch (error) {
       console.error(`Error al cambiar estado de la cita ${id}:`, error)
       setError("Error al actualizar el estado de la cita. Por favor, intenta nuevamente.")

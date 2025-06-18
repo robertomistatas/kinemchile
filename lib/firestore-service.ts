@@ -570,6 +570,10 @@ export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
     const inicioTimestamp = inicioDelDia.getTime()
     const finTimestamp = finDelDia.getTime()
 
+    console.log(`Buscando citas entre: ${new Date(inicioTimestamp).toLocaleString()} y ${new Date(finTimestamp).toLocaleString()}`)
+    console.log(`Timestamps: inicio=${inicioTimestamp}, fin=${finTimestamp}`)
+
+    // Primero intentemos buscar por timestamp (número)
     const citasRef = collection(firestore, "citas")
     const q = query(
       citasRef,
@@ -693,10 +697,18 @@ export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "updatedAt
   try {
     console.log("Creando nueva cita con datos:", JSON.stringify(cita))
 
-    // Asegurarse de que la fecha sea un timestamp
-    let fechaTimestamp = cita.fecha
+    // Asegurarse de que la fecha sea un timestamp numérico
+    let fechaTimestamp: number;
     if (typeof cita.fecha === "string") {
-      fechaTimestamp = new Date(cita.fecha).getTime()
+      fechaTimestamp = new Date(cita.fecha).getTime();
+      console.log(`Convertir fecha string a timestamp: ${cita.fecha} -> ${fechaTimestamp}`);
+    } else if (typeof cita.fecha === "number") {
+      fechaTimestamp = cita.fecha;
+      console.log(`Fecha ya es timestamp numérico: ${fechaTimestamp}`);
+    } else {
+      // Si es objeto Date o algo inesperado
+      fechaTimestamp = new Date().getTime();
+      console.log(`Fecha en formato desconocido, usando timestamp actual: ${fechaTimestamp}`);
     }
 
     // Asegurarse de que el pacienteId sea una cadena
@@ -710,7 +722,7 @@ export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "updatedAt
 
     const citaData = {
       ...cita,
-      fecha: fechaTimestamp,
+      fecha: fechaTimestamp, // Siempre guardamos como número
       pacienteId: pacienteId,
       estado: estado,
       duracion: duracion,
