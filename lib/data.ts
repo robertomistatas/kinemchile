@@ -35,13 +35,21 @@ export interface Cita {
   id?: string
   pacienteId: string
   pacienteNombre?: string
-  fecha: string
+  fecha: string | number  // Puede ser timestamp número o string de fecha
   hora: string
   duracion: number
   estado: string
   notas?: string
-  createdAt?: string
-  updatedAt?: string
+  createdAt?: string | number // Puede ser timestamp o string de fecha
+  updatedAt?: string | number // Puede ser timestamp o string de fecha
+  paciente?: {
+    id?: string
+    nombre: string
+    apellido: string
+    rut: string
+  }
+  motivo?: string
+  prevision?: string
 }
 
 export interface Usuario {

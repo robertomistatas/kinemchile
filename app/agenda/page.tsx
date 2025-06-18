@@ -131,7 +131,6 @@ export default function AgendaPage() {
       fetchPacientes()
     }
   }, [user])
-
   // Cargar citas para la fecha seleccionada
   useEffect(() => {
     async function fetchCitas() {
@@ -141,6 +140,17 @@ export default function AgendaPage() {
         setCitasLoading(true)
         const citasData = await getCitasPorFecha(date)
         console.log(`Citas cargadas para ${date.toLocaleDateString()}:`, citasData.length)
+        
+        if (citasData.length > 0) {
+          console.log("Ejemplo de cita cargada:", {
+            id: citasData[0].id,
+            pacienteId: citasData[0].pacienteId,
+            fecha: new Date(citasData[0].fecha).toLocaleString(),
+            hora: citasData[0].hora,
+            estado: citasData[0].estado
+          });
+        }
+        
         setCitas(citasData)
       } catch (error) {
         console.error("Error al cargar citas:", error)
@@ -288,13 +298,12 @@ export default function AgendaPage() {
       setSubmitting(false)
     }
   }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError("")
     setSuccess(false)
-
+    
     try {
       if (activeTab === "paciente-nuevo") {
         handleCrearPacienteRapido()
@@ -322,12 +331,13 @@ export default function AgendaPage() {
           nombre: selectedPaciente.nombre,
           apellido: selectedPaciente.apellido,
           rut: selectedPaciente.rut,
-        },
-        motivo: formData.motivo,
-        prevision: formData.prevision,
+        },        motivo: formData.motivo || "",
+        prevision: formData.prevision || "",
+        duracion: 60, // Añadir duración por defecto (1 hora)
+        estado: "programada", // Asegurarnos que el estado se incluya
       }
-
-      if (citaEnEdicion) {
+      
+      if (citaEnEdicion && citaEnEdicion.id) {
         // Actualizar cita existente
         await actualizarCita(citaEnEdicion.id, citaData)
 
@@ -335,28 +345,40 @@ export default function AgendaPage() {
         setCitas(
           citas.map((c) =>
             c.id === citaEnEdicion.id
-              ? ({
+              ? {
                   ...citaData,
                   id: citaEnEdicion.id,
-                  estado: citaEnEdicion.estado,
-                  createdAt: citaEnEdicion.createdAt,
-                } as Cita)
+                  estado: citaEnEdicion.estado || "programada",
+                  createdAt: citaEnEdicion.createdAt || Date.now(),
+                } as Cita
               : c,
           ),
         )
       } else {
         // Crear nueva cita
-        const citaId = await crearCita(citaData)
+        const citaId = await crearCita({
+          ...citaData,
+          // Convertir fecha de número a string si es necesario según el modelo de datos
+          fecha: citaData.fecha.toString()
+        })
 
-        // Si la fecha de la cita es la misma que la fecha seleccionada, añadirla a la lista
+        // Siempre añadir la cita a la lista si estamos en la fecha correcta
         if (fechaHora.toDateString() === date?.toDateString()) {
+          console.log("Añadiendo nueva cita a la lista con ID:", citaId)
+          
+          // Crear objeto de cita completo para mostrar en la UI
           const nuevaCita: Cita = {
             id: citaId,
             ...citaData,
+            fecha: citaData.fecha, // Mantener como número para la UI
             estado: "programada",
             createdAt: Date.now(),
           }
-          setCitas([...citas, nuevaCita])
+          
+          console.log("Nueva cita creada:", nuevaCita);
+          setCitas((citasActuales) => [...citasActuales, nuevaCita])
+        } else {
+          console.log("La fecha de la cita no coincide con la fecha seleccionada. No se muestra en la lista actual.")
         }
       }
 
@@ -391,8 +413,13 @@ export default function AgendaPage() {
     setActiveTab("paciente-existente")
     setShowNuevaCita(true)
   }
-
-  const handleEliminarCita = async (id: string) => {
+  const handleEliminarCita = async (id: string | null) => {
+    if (!id) {
+      console.error("No se proporcionó un ID de cita válido");
+      setConfirmDelete(null);
+      return;
+    }
+    
     try {
       await eliminarCita(id)
       setCitas(citas.filter((c) => c.id !== id))
@@ -403,7 +430,11 @@ export default function AgendaPage() {
     }
   }
 
-  const handleCambiarEstadoCita = async (id: string, nuevoEstado: "programada" | "completada" | "cancelada") => {
+  const handleCambiarEstadoCita = async (id: string | undefined, nuevoEstado: "programada" | "completada" | "cancelada") => {
+    if (!id) {
+      console.error("No se proporcionó un ID de cita válido");
+      return;
+    }
     try {
       await cambiarEstadoCita(id, nuevoEstado)
 
@@ -439,7 +470,6 @@ export default function AgendaPage() {
     setActiveTab("paciente-existente")
     setNuevoPacienteErrors({})
   }
-
   // Ordenar citas por hora
   const citasOrdenadas = [...citas].sort((a, b) => {
     // Primero por hora
@@ -447,8 +477,9 @@ export default function AgendaPage() {
     if (comparacionHora !== 0) return comparacionHora
 
     // Si la hora es igual, ordenar por estado (programada, completada, cancelada)
-    const prioridadEstado = { programada: 0, completada: 1, cancelada: 2 }
-    return prioridadEstado[a.estado] - prioridadEstado[b.estado]
+    const prioridadEstado: Record<string, number> = { programada: 0, completada: 1, cancelada: 2 }
+    // Asignamos una prioridad por defecto (3) para estados desconocidos
+    return (prioridadEstado[a.estado] ?? 3) - (prioridadEstado[b.estado] ?? 3)
   })
 
   // Función para obtener el color según el estado
@@ -543,7 +574,7 @@ export default function AgendaPage() {
                         </div>
                         <div>
                           <p className="font-medium">
-                            {cita.paciente.nombre} {cita.paciente.apellido}
+                            {cita.paciente?.nombre || cita.pacienteNombre || "Sin nombre"} {cita.paciente?.apellido || ""}
                           </p>
                           <p className="text-sm text-muted-foreground">
                             {cita.hora} - {cita.motivo}
@@ -596,8 +627,10 @@ export default function AgendaPage() {
                                 <Clock className="mr-2 h-4 w-4" />
                                 Marcar como programada
                               </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem className="text-red-600" onClick={() => setConfirmDelete(cita.id)}>
+                            )}                            <DropdownMenuItem 
+                              className="text-red-600" 
+                              onClick={() => cita.id && setConfirmDelete(cita.id)}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Eliminar
                             </DropdownMenuItem>

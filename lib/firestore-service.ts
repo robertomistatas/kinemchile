@@ -581,14 +581,42 @@ export async function getCitasPorFecha(fecha: Date): Promise<Cita[]> {
     const snapshot = await getDocs(q)
     console.log(`Se encontraron ${snapshot.docs.length} citas para la fecha ${fecha.toLocaleDateString()}`)
 
+    // Procesar los resultados y convertir campos según sea necesario
     return snapshot.docs.map((doc) => {
-      const data = doc.data()
+      const data = doc.data();
+      
+      // Normalizar la fecha (asegurarse que sea timestamp)
+      let fechaNormalizada = data.fecha;
+      if (typeof data.fecha === "object" && data.fecha !== null) {
+        if (data.fecha.toDate) {
+          fechaNormalizada = data.fecha.toDate().getTime();
+        } else if (data.fecha.seconds) {
+          fechaNormalizada = data.fecha.seconds * 1000;
+        }
+      }
+      
+      // Asegurar que exista una duración predeterminada
+      const duracion = data.duracion || 60;
+      
+      // Asegurar que exista un estado predeterminado
+      const estado = data.estado || "programada";
+      
+      // Crear el objeto cita con datos normalizados
       return {
         id: doc.id,
         ...data,
-        fecha: typeof data.fecha === "object" && data.fecha.toDate ? data.fecha.toDate().getTime() : data.fecha,
-      }
-    }) as Cita[]
+        fecha: fechaNormalizada,
+        duracion: duracion,
+        estado: estado,
+        // Añadir campos que podrían faltar para garantizar compatibilidad con la interfaz
+        paciente: data.paciente || { 
+          id: data.pacienteId,
+          nombre: data.pacienteNombre || "Sin nombre",
+          apellido: "",
+          rut: ""
+        }
+      } as Cita;
+    });
   } catch (error) {
     console.error(`Error al obtener citas para la fecha ${fecha.toLocaleDateString()}:`, error)
     return []
@@ -658,7 +686,7 @@ export async function getCita(id: string): Promise<Cita | null> {
   }
 }
 
-export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "estado" | "updatedAt">): Promise<string> {
+export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "updatedAt">): Promise<string> {
   const firestore = getDb()
   if (!firestore) throw new Error("Firestore no está inicializado")
 
@@ -674,11 +702,18 @@ export async function crearCita(cita: Omit<Cita, "id" | "createdAt" | "estado" |
     // Asegurarse de que el pacienteId sea una cadena
     const pacienteId = String(cita.pacienteId)
 
+    // Asegurarse de que se establezca la duración si no existe
+    const duracion = cita.duracion || 60;
+
+    // Asegurar que el estado sea "programada" si no viene definido
+    const estado = cita.estado || "programada";
+
     const citaData = {
       ...cita,
       fecha: fechaTimestamp,
       pacienteId: pacienteId,
-      estado: "programada",
+      estado: estado,
+      duracion: duracion,
       createdAt: serverTimestamp(),
     }
 
