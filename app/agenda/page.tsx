@@ -17,8 +17,9 @@ import {
   actualizarCita,
   eliminarCita,
   cambiarEstadoCita,
+  getProfesionales
 } from "@/lib/firestore"
-import type { Paciente, Cita } from "@/lib/data"
+import type { Paciente, Cita, Usuario } from "@/lib/data"
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,7 @@ import { formatearRut, validarRut } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { collection, getDocs, getDb } from "@/lib/firebase"
 import { PacienteSearchOptimized } from "@/components/paciente-search-optimized"
+import { DebugCitas } from "@/components/debug-citas"
 
 export default function AgendaPage() {
   const { user, loading } = useAuth()
@@ -65,7 +67,9 @@ export default function AgendaPage() {
     hora: "09:00",
     motivo: "",
     prevision: "",
+    profesional_id: "",
   })
+  const [profesionales, setProfesionales] = useState<Usuario[]>([])
   const [dataLoading, setDataLoading] = useState(false)
   const [citasLoading, setCitasLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -82,6 +86,8 @@ export default function AgendaPage() {
   })
   const [nuevoPacienteErrors, setNuevoPacienteErrors] = useState<Record<string, string>>({})
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [refreshCitas, setRefreshCitas] = useState(0);
+  const [showDebug, setShowDebug] = useState(false); // Estado para mostrar/ocultar panel de depuración
 
   useEffect(() => {
     if (!loading && !user) {
@@ -131,8 +137,6 @@ export default function AgendaPage() {
       fetchPacientes()
     }
   }, [user])  // Estado para forzar la recarga de citas
-  const [refreshCitas, setRefreshCitas] = useState(0);
-
   // Cargar citas para la fecha seleccionada
   useEffect(() => {
     async function fetchCitas() {
@@ -141,9 +145,25 @@ export default function AgendaPage() {
       try {
         setCitasLoading(true)
         console.log("Solicitando citas para la fecha:", date.toLocaleDateString());
+        console.log("Timestamp inicio del día:", new Date(date).setHours(0, 0, 0, 0));
+        console.log("Timestamp fin del día:", new Date(date).setHours(23, 59, 59, 999));
         
         const citasData = await getCitasPorFecha(date)
         console.log(`Citas cargadas para ${date.toLocaleDateString()}:`, citasData.length)
+        
+        // Diagnóstico detallado de cada cita para ver por qué no aparecen
+        citasData.forEach((cita, index) => {
+          console.log(`Cita ${index + 1}:`, {
+            id: cita.id,
+            pacienteId: cita.pacienteId,
+            fecha: cita.fecha,
+            fechaFormateada: typeof cita.fecha === 'number' ? new Date(cita.fecha).toLocaleString() : 'No es un número',
+            hora: cita.hora,
+            estado: cita.estado,
+            paciente: cita.paciente ? `${cita.paciente.nombre} ${cita.paciente.apellido}` : 'No hay datos de paciente',
+            mismosDia: date ? new Date(cita.fecha).toDateString() === date.toDateString() : false
+          });
+        });
         
         if (citasData.length > 0) {
           console.log("Ejemplo de cita cargada:", {
@@ -168,6 +188,24 @@ export default function AgendaPage() {
       fetchCitas();
     }
   }, [user, date, refreshCitas]) // Añadido refreshCitas para forzar recarga
+
+  // Cargar profesionales (kinesiologos y médicos)
+  useEffect(() => {
+    async function fetchProfesionales() {
+      if (!user) return;
+      
+      try {
+        console.log("Cargando profesionales...");
+        const profesionalesData = await getProfesionales();
+        console.log(`Se encontraron ${profesionalesData.length} profesionales`);
+        setProfesionales(profesionalesData);
+      } catch (error) {
+        console.error("Error al cargar profesionales:", error);
+      }
+    }
+    
+    fetchProfesionales();
+  }, [user]);
 
   useEffect(() => {
     async function fetchPacienteSeleccionado() {
@@ -319,16 +357,18 @@ export default function AgendaPage() {
         setError("Debes seleccionar un paciente")
         setSubmitting(false)
         return
-      }
-
-      // Crear objeto de fecha combinando la fecha y hora
+      }      // Crear objeto de fecha combinando la fecha y hora
       const fechaHora = new Date(formData.fecha)
       const [horas, minutos] = formData.hora.split(":").map(Number)
       fechaHora.setHours(horas, minutos, 0, 0)
-
-      // Datos de la cita
+      
+      // Obtener timestamp para la fecha (número)
+      const timestamp = fechaHora.getTime()
+      console.log(`Creando cita para: ${fechaHora.toLocaleString()} (timestamp: ${timestamp})`)
+      console.log(`Fecha actual seleccionada: ${date?.toLocaleString()} (timestamp: ${date?.getTime()})`)
+        // Datos de la cita
       const citaData = {
-        fecha: fechaHora.getTime(),
+        fecha: timestamp,
         hora: formData.hora,
         pacienteId: formData.pacienteId,
         paciente: {
@@ -336,10 +376,24 @@ export default function AgendaPage() {
           nombre: selectedPaciente.nombre,
           apellido: selectedPaciente.apellido,
           rut: selectedPaciente.rut,
-        },        motivo: formData.motivo || "",
+        },        
+        motivo: formData.motivo || "",
         prevision: formData.prevision || "",
         duracion: 60, // Añadir duración por defecto (1 hora)
         estado: "programada", // Asegurarnos que el estado se incluya
+      }
+      
+      // Añadir información del profesional si se seleccionó uno
+      if (formData.profesional_id) {
+        const profesionalSeleccionado = profesionales.find(p => p.id === formData.profesional_id);
+        if (profesionalSeleccionado) {
+          Object.assign(citaData, {
+            profesional_id: profesionalSeleccionado.id,
+            profesional_nombre: profesionalSeleccionado.nombre,
+            profesional_funcion: profesionalSeleccionado.funcion
+          });
+          console.log(`Profesional asignado: ${profesionalSeleccionado.nombre} (${profesionalSeleccionado.funcion})`);
+        }
       }
       
       if (citaEnEdicion && citaEnEdicion.id) {
@@ -367,7 +421,13 @@ export default function AgendaPage() {
         })
 
         // Siempre añadir la cita a la lista si estamos en la fecha correcta
-        if (fechaHora.toDateString() === date?.toDateString()) {
+        const dateString = date?.toDateString() || '';
+        const fechaHoraString = fechaHora.toDateString();
+        
+        console.log(`Comparando fechas: Cita (${fechaHoraString}) vs Seleccionada (${dateString})`);
+        
+        // Verificamos si las fechas coinciden para añadir a la UI
+        if (fechaHoraString === dateString) {
           console.log("Añadiendo nueva cita a la lista con ID:", citaId)
           
           // Crear objeto de cita completo para mostrar en la UI
@@ -380,9 +440,13 @@ export default function AgendaPage() {
           }
           
           console.log("Nueva cita creada:", nuevaCita);
-          setCitas((citasActuales) => [...citasActuales, nuevaCita])
+          
+          // Añadir a la lista de citas y reordenar
+          setCitas((citasActuales) => [...citasActuales, nuevaCita]);
         } else {
           console.log("La fecha de la cita no coincide con la fecha seleccionada. No se muestra en la lista actual.")
+          console.log(`Fecha cita: ${new Date(citaData.fecha).toDateString()}`)
+          console.log(`Fecha seleccionada: ${date?.toDateString()}`)
         }
       }      setSuccess(true)
 
@@ -466,13 +530,14 @@ export default function AgendaPage() {
   }
 
   const resetForm = () => {
-    console.log("Reseteando formulario de cita")
+    console.log("Reseteando formulario de cita");
     setFormData({
       pacienteId: "",
       fecha: new Date(),
       hora: "09:00",
       motivo: "",
       prevision: "",
+      profesional_id: "",
     })
     setNuevoPaciente({
       nombre: "",
@@ -527,11 +592,80 @@ export default function AgendaPage() {
             <h1 className="text-3xl font-bold tracking-tight">Agenda</h1>
             <p className="text-sm text-muted-foreground">Gestión de citas y horarios</p>
           </div>
-          <Button onClick={() => setShowNuevaCita(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Cita
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowNuevaCita(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Cita
+            </Button>
+            {/* Botón de depuración */}
+            <Button variant="outline" onClick={() => setShowDebug(!showDebug)}>
+              {showDebug ? "Ocultar Debug" : "Mostrar Debug"}
+            </Button>
+          </div>
         </div>
+
+        {/* Panel de depuración */}
+        {showDebug && (
+          <Card className="mb-6 border-dashed border-yellow-500">
+            <CardHeader className="bg-yellow-50">
+              <CardTitle>Panel de Depuración</CardTitle>
+              <CardDescription>Información para depuración de citas</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium">Fecha Seleccionada:</h3>
+                <p>{date ? date.toLocaleString() : "Ninguna"}</p>
+              </div>              <div>                <h3 className="text-sm font-medium">Citas Cargadas ({citas.length}):</h3>
+                {citas.length > 0 ? (
+                  <div className="mt-2 space-y-2 max-h-60 overflow-auto">
+                    <div className="text-xs mb-2 p-2 bg-gray-50 rounded">
+                      <strong>Citas ordenadas:</strong> {citasOrdenadas.length}
+                      <br />
+                      <strong>Fecha seleccionada:</strong> {date?.toLocaleDateString()}
+                      <br />
+                      <strong>Timestamp seleccionado:</strong> {date?.getTime()}
+                    </div>
+                    {citas.map((cita) => (
+                      <div key={cita.id} className="border p-2 rounded text-xs">
+                        <div><strong>ID:</strong> {cita.id}</div>
+                        <div><strong>Fecha (tipo):</strong> {typeof cita.fecha}</div>
+                        <div><strong>Fecha (valor):</strong> {typeof cita.fecha === 'number' ? new Date(cita.fecha).toLocaleString() : String(cita.fecha)}</div>
+                        <div><strong>Timestamp actual:</strong> {date ? date.getTime() : 'No hay fecha'}</div>
+                        <div><strong>¿Mismo día?:</strong> {date && typeof cita.fecha === 'number' ? new Date(cita.fecha).toDateString() === date.toDateString() ? 'Sí' : 'No' : 'No comparable'}</div>
+                        <div><strong>Hora:</strong> {cita.hora}</div>
+                        <div><strong>Estado:</strong> {cita.estado}</div>
+                        <div><strong>Paciente:</strong> {cita.paciente?.nombre || 'N/A'} {cita.paciente?.apellido || ''}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No hay citas cargadas</p>
+                )}
+              </div>              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" onClick={() => router.push('/agenda/debug-citas')}>
+                  Ir a herramienta de depuración
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setRefreshCitas(prev => prev + 1)}>
+                  Recargar citas
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  onClick={() => {
+                    if (date) {
+                      // Forzar nueva carga con la misma fecha
+                      const nuevaFecha = new Date(date.getTime());
+                      setDate(nuevaFecha);
+                      console.log("Forzando recarga con fecha:", nuevaFecha.toLocaleString());
+                    }
+                  }}
+                >
+                  Forzar recarga de fecha
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
@@ -607,10 +741,14 @@ export default function AgendaPage() {
                                 : cita.estado === "completada"
                                   ? "Completada"
                                   : "Cancelada"}
-                            </span>
-                            {cita.prevision && (
+                            </span>                            {cita.prevision && (
                               <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
                                 {cita.prevision}
+                              </span>
+                            )}
+                            {cita.profesional_nombre && (
+                              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                {cita.profesional_nombre} ({cita.profesional_funcion === "kinesiologa" ? "Kine" : "Med"})
                               </span>
                             )}
                           </div>
@@ -899,7 +1037,34 @@ export default function AgendaPage() {
                           <SelectContent>
                             <SelectItem value="Particular">Particular</SelectItem>
                             <SelectItem value="Fonasa">Fonasa</SelectItem>
-                            <SelectItem value="Isapre">Isapre</SelectItem>
+                            <SelectItem value="Isapre">Isapre</SelectItem>                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="profesional">
+                          Profesional Tratante
+                        </Label>
+                        <Select
+                          value={formData.profesional_id}
+                          onValueChange={(value) => handleSelectChange("profesional_id", value)}
+                          disabled={submitting || success}
+                        >
+                          <SelectTrigger id="profesional">
+                            <SelectValue placeholder="Selecciona un profesional" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {profesionales.length === 0 ? (
+                              <SelectItem value="no-profesionales" disabled>
+                                No hay profesionales disponibles
+                              </SelectItem>
+                            ) : (
+                              profesionales.map((profesional) => (
+                                <SelectItem key={profesional.id} value={profesional.id || ""}>
+                                  {profesional.nombre} ({profesional.funcion === "kinesiologa" ? "Kinesiólogo" : "Médico"})
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -954,6 +1119,11 @@ export default function AgendaPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Panel de depuración - solo visible en desarrollo */}
+        {process.env.NODE_ENV !== "production" && showDebug && (
+          <DebugCitas />
+        )}
       </div>
     </Layout>
   )

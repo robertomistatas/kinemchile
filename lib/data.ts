@@ -50,6 +50,9 @@ export interface Cita {
   }
   motivo?: string
   prevision?: string
+  profesional_id?: string // ID del profesional tratante
+  profesional_nombre?: string // Nombre del profesional tratante
+  profesional_funcion?: string // Función del profesional (kinesiologo, medico)
 }
 
 export interface Usuario {

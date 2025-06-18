@@ -110,9 +110,9 @@ export {
   crearCita,
   actualizarCita,
   eliminarCita,
-  cambiarEstadoCita,
-  asignarKinesiologoAPaciente,
+  cambiarEstadoCita,  asignarKinesiologoAPaciente,
   getUsuarios,
   debugSesiones,
   debugCitas,
+  getProfesionales,
 } from "@/lib/firestore-service"
