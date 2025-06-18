@@ -22,12 +22,12 @@ export default function DashboardPage() {
   })
   const [dataLoading, setDataLoading] = useState(true)
   const [proximasCitas, setProximasCitas] = useState<any[]>([])
-
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
     }
   }, [user, loading, router])
+  
   useEffect(() => {
     async function fetchData() {
       try {
@@ -40,6 +40,8 @@ export default function DashboardPage() {
           getSesiones(),
           getCitasPorFecha(ahora)
         ])
+
+        console.log('Dashboard - Citas obtenidas del día:', citasHoy.length)
 
         const pacientesActivos = pacientes.filter((p: any) => p.activo).length
 
@@ -59,20 +61,34 @@ export default function DashboardPage() {
               ? new Date(cita.fecha) 
               : typeof cita.fecha === 'string' 
                 ? new Date(cita.fecha)
-                : cita.fecha.toDate ? cita.fecha.toDate() : new Date()
+                : cita.fecha.toDate 
+                  ? cita.fecha.toDate() 
+                  : new Date()
             
             hora = fechaObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
           }
 
           // Formatear nombre del paciente
-          const nombrePaciente = `${cita.paciente_nombre || ''} ${cita.paciente_apellido || ''}`
+          // Primero intentamos con campos específicos de paciente
+          let nombrePaciente = ''
+          
+          if (cita.paciente_nombre) {
+            nombrePaciente = `${cita.paciente_nombre || ''} ${cita.paciente_apellido || ''}`
+          } else if (cita.paciente && typeof cita.paciente === 'object') {
+            // Si no hay campos específicos, revisamos si hay un objeto paciente
+            nombrePaciente = `${cita.paciente.nombre || ''} ${cita.paciente.apellido || ''}`
+          }
+          
+          // Determinar el profesional
+          const profesional = cita.profesional_nombre || 
+                            (cita.profesional_id ? 'Prof. ID: ' + cita.profesional_id : 'Sin asignar')
           
           return {
             id: cita.id,
             paciente: nombrePaciente.trim() || 'Paciente sin nombre',
             hora: hora,
             motivo: cita.motivo || 'Sin especificar',
-            profesional: cita.profesional_nombre || 'Sin asignar'
+            profesional: profesional
           }
         })
 
@@ -80,6 +96,8 @@ export default function DashboardPage() {
         citasFormateadas.sort((a: any, b: any) => {
           return a.hora.localeCompare(b.hora)
         })
+        
+        console.log('Dashboard - Citas formateadas:', citasFormateadas.length)
 
         // Actualizar el estado
         setProximasCitas(citasFormateadas)
