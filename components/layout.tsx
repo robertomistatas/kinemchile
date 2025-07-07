@@ -18,6 +18,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User, Home, Users, Calendar, LogOut, Heart, LayoutDashboard, Settings } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 
 interface LayoutProps {
   children: React.ReactNode
@@ -45,9 +46,9 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b bg-background no-print">
-        <div className="container flex h-16 items-center justify-between py-4">
-          <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-10 border-b bg-background no-print w-full">
+        <div className="container max-w-full px-2 sm:px-4 flex h-16 items-center justify-between py-2 gap-2 md:gap-0">
+          <div className="flex items-center gap-2 min-w-0">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="md:hidden">
@@ -55,13 +56,13 @@ export function Layout({ children }: LayoutProps) {
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-64">
+              <SheetContent side="left" className="w-64 max-w-[90vw] overflow-y-auto">
                 <div className="flex flex-col gap-6 py-4">
                   <div className="flex items-center gap-2">
                     <img
                       src="https://static.wixstatic.com/media/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png/v1/crop/x_0,y_0,w_920,h_343/fill/w_171,h_63,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png"
                       alt="Kinem Chile Logo"
-                      className="h-8"
+                      className="h-8 max-w-full object-contain"
                     />
                   </div>
                   <nav className="flex flex-col gap-2">
@@ -79,60 +80,34 @@ export function Layout({ children }: LayoutProps) {
                         {item.name}
                       </Link>
                     ))}
-
-                    {/* Enlace a Configuración - solo visible para roberto@mistatas.com */}
-                    {user?.email === "roberto@mistatas.com" && (
-                      <Link
-                        href="/configuracion"
-                        className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
-                          pathname === "/configuracion"
-                            ? "bg-primary text-primary-foreground"
-                            : "hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        <Settings className="h-4 w-4" />
-                        Configuración
-                      </Link>
-                    )}
+                    <ThemeToggle />
                   </nav>
                 </div>
               </SheetContent>
             </Sheet>
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
               <img
                 src="https://static.wixstatic.com/media/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png/v1/crop/x_0,y_0,w_920,h_343/fill/w_171,h_63,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/1831cb_311ba82ac7844cd5ba994725d9a25a1e~mv2.png"
                 alt="Kinem Chile Logo"
-                className="h-8"
+                className="h-8 max-w-[120px] object-contain"
               />
             </Link>
           </div>
-          <nav className="hidden md:flex gap-6">
+          <nav className="hidden md:flex gap-4 items-center flex-shrink-0">
             {navigation.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`font-medium ${
+                className={`font-medium whitespace-nowrap ${
                   pathname === item.href ? "text-primary" : "text-foreground hover:text-primary"
                 }`}
               >
                 {item.name}
               </Link>
             ))}
-
-            {/* Enlace a Configuración - solo visible para roberto@mistatas.com */}
-            {user?.email === "roberto@mistatas.com" && (
-              <Link
-                href="/configuracion"
-                className={`font-medium flex items-center gap-1 ${
-                  pathname === "/configuracion" ? "text-primary" : "text-foreground hover:text-primary"
-                }`}
-              >
-                <Settings className="h-4 w-4" />
-                Configuración
-              </Link>
-            )}
+            <ThemeToggle />
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -145,8 +120,8 @@ export function Layout({ children }: LayoutProps) {
               <DropdownMenuContent className="w-56" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.email || "Usuario"}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user?.email || "usuario@ejemplo.com"}</p>
+                    <p className="text-sm font-medium leading-none truncate max-w-[150px]">{user?.email || "Usuario"}</p>
+                    <p className="text-xs leading-none text-muted-foreground truncate max-w-[150px]">{user?.email || "usuario@ejemplo.com"}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -166,16 +141,17 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </header>
-      <main className="flex-1 bg-muted/40">
-        <div className="container py-6">{children}</div>
+      <main className="flex-1 bg-muted/40 w-full">
+        <div className="container max-w-full px-2 sm:px-4 py-4 md:py-6">{children}</div>
       </main>
-      <footer className="border-t bg-background no-print">
-        <div className="container flex flex-col gap-2 py-4 md:flex-row md:items-center md:justify-between">
+      <footer className="border-t bg-background no-print w-full">
+        <div className="container max-w-full flex flex-col gap-2 py-4 md:flex-row md:items-center md:justify-between px-2 sm:px-4">
           <p className="text-center text-sm leading-loose text-muted-foreground md:text-left">
             © 2025 Kinem Chile. Todos los derechos reservados.
           </p>
           <div className="flex items-center justify-center gap-1 text-sm md:justify-end">
-            Hecho con <Heart className="h-4 w-4 text-red-500 fill-red-500" /> por Rrojas
+            Hecho con{" "}
+            <Heart className="h-4 w-4 text-red-500 fill-red-500" /> por Rrojas
           </div>
         </div>
       </footer>
