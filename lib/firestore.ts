@@ -43,8 +43,8 @@ const getDb = () => {
   }
 }
 
-// Modificar la función getPacientes para filtrar por kinesiólogo si es necesario
-export async function getPacientes(kinesiologoId?: string): Promise<Paciente[]> {
+// Modificar la función getPacientes para filtrar por kinesiólogo o tratante si es necesario
+export async function getPacientes(profesionalId?: string): Promise<Paciente[]> {
   const firestore = getDb()
   if (!firestore) return []
 
@@ -52,11 +52,17 @@ export async function getPacientes(kinesiologoId?: string): Promise<Paciente[]> 
     console.log("Obteniendo pacientes...")
     const pacientesRef = collection(firestore, "pacientes")
 
-    // Si se proporciona un ID de kinesiólogo, filtrar por él
+    // Si se proporciona un ID de profesional, filtrar por tratante_id o kinesiologo_id
     let snapshot
-    if (kinesiologoId) {
-      console.log(`Filtrando por kinesiólogo: ${kinesiologoId}`)
-      const q = query(pacientesRef, where("kinesiologo_id", "==", kinesiologoId))
+    if (profesionalId) {
+      const q = query(
+        pacientesRef,
+        // Buscar pacientes donde el profesional sea tratante o kinesiologo
+        where("$or", "in", [
+          ["tratante_id", profesionalId],
+          ["kinesiologo_id", profesionalId]
+        ])
+      )
       snapshot = await getDocs(q)
     } else {
       snapshot = await getDocs(pacientesRef)
@@ -84,6 +90,9 @@ export async function getPacientes(kinesiologoId?: string): Promise<Paciente[]> 
         prevision: data.prevision || "",
         kinesiologo_id: data.kinesiologo_id || null,
         kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || null,
+        tratante_nombre: data.tratante_nombre || null,
+        tratante_funcion: data.tratante_funcion || null,
       } as Paciente
     })
   } catch (error) {

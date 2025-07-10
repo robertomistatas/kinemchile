@@ -10,13 +10,22 @@ export interface Paciente {
   direccion: string
   prevision?: string
   diagnostico?: string
+  diagnosticoMedico?: string
+  antecedentesPersonales?: string
+  antecedentesClinicosRelevantes?: string
   observaciones?: string
   activo?: boolean
   tratante_id?: string // ID del profesional tratante
   tratante_nombre?: string // Nombre del profesional tratante
   tratante_funcion?: string // Función del profesional tratante (kinesiologa, medico)
+  kinesiologo_id?: string
+  kinesiologo_nombre?: string
+  fechaAlta?: string | null
+  notasAlta?: string | null
   createdAt?: string
   updatedAt?: string
+  evaluacionInicial?: string
+  evaluacionFinal?: string
 }
 
 export interface Sesion {

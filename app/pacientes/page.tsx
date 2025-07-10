@@ -10,6 +10,7 @@ import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { getPacientes } from "@/lib/firestore"
+import { eliminarPaciente } from "@/lib/firestore-service"
 import type { Paciente } from "@/lib/data"
 import {
   AlertDialog,
@@ -43,9 +44,9 @@ export default function PacientesPage() {
         setDataLoading(true)
 
         let data
-        // Si el usuario es kinesiólogo, cargar solo sus pacientes
-        if (userInfo?.rol === "kinesiologo") {
-          data = await getPacientes(userInfo.id)
+        // Si el usuario es profesional, cargar solo sus pacientes
+        if (userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional") {
+          data = (await getPacientes()).filter((p) => p.tratante_id === userInfo.id)
         } else {
           // Si es admin o recepcionista, cargar todos los pacientes
           data = await getPacientes()
@@ -83,11 +84,18 @@ export default function PacientesPage() {
     if (!pacienteAEliminar) return
 
     try {
-      // Aquí iría la lógica para eliminar el paciente
-      // Por ahora solo actualizamos el estado local
-      setPacientes(pacientes.filter((p) => p.id !== pacienteAEliminar))
+      await eliminarPaciente(pacienteAEliminar)
+      // Recargar la lista desde la base de datos
+      let data
+      if (userInfo?.rol === "kinesiologo") {
+        data = await getPacientes(userInfo.id)
+      } else {
+        data = await getPacientes()
+      }
+      setPacientes(data)
     } catch (error) {
       console.error("Error al eliminar paciente:", error)
+      setError("No se pudo eliminar el paciente. Intenta nuevamente.")
     } finally {
       setPacienteAEliminar(null)
     }
@@ -133,6 +141,7 @@ export default function PacientesPage() {
                 <TableHead className="hidden md:table-cell">Teléfono</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
                 <TableHead className="hidden md:table-cell">Estado</TableHead>
+                <TableHead className="hidden md:table-cell">Profesional Tratante</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -168,6 +177,9 @@ export default function PacientesPage() {
                       >
                         {paciente.activo ? "Activo" : "Inactivo"}
                       </span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {paciente.tratante_nombre || <span className="text-muted-foreground">Sin asignar</span>}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { getPaciente, getSesionesPaciente, actualizarPaciente } from "@/lib/firestore"
-import type { Paciente, Sesion } from "@/lib/data"
+import type { Paciente, Sesion, Usuario } from "@/lib/data"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit } from "lucide-react"
@@ -56,12 +56,11 @@ export default function PacienteDetallePage() {
 
   // Dentro del componente PacienteDetallePage, añadir estos estados
   const [kinesiologo, setKinesiologo] = useState("")
-  const [kinesiolocos, setKinesiologos] = useState([])
+  const [kinesiolocos, setKinesiologos] = useState<Usuario[]>([])
   const [asignandoKinesiologo, setAsignandoKinesiologo] = useState(false)
 
-  // Dentro del componente PacienteDetallePage, añadir estos estados
   const [tratante, setTratante] = useState("")
-  const [profesionales, setProfesionales] = useState([])
+  const [profesionales, setProfesionales] = useState<Usuario[]>([])
   const [asignandoTratante, setAsignandoTratante] = useState(false)
   const [success, setSuccess] = useState("")
 
@@ -216,13 +215,9 @@ export default function PacienteDetallePage() {
 
       await asignarTratanteAPaciente(id, tratante, profesionalNombre, profesionalFuncion)
 
-      // Actualizar el paciente en el estado local
-      setPaciente({
-        ...paciente,
-        tratante_id: tratante,
-        tratante_nombre: profesionalNombre,
-        tratante_funcion: profesionalFuncion,
-      })
+      // Volver a cargar el paciente desde la base de datos para reflejar el cambio real
+      const pacienteActualizado = await getPaciente(id)
+      setPaciente(pacienteActualizado)
 
       // Mostrar mensaje de éxito
       setSuccess("Profesional asignado correctamente")
@@ -599,6 +594,12 @@ export default function PacienteDetallePage() {
                       <p className="text-sm font-medium text-muted-foreground">Dirección</p>
                       <p>{paciente.direccion || "No registrada"}</p>
                     </div>
+                    {paciente.tratante_nombre && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Profesional Tratante</p>
+                        <p>{paciente.tratante_nombre}</p>
+                      </div>
+                    )}
                     {paciente.prevision && (
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Previsión</p>
@@ -837,6 +838,12 @@ export default function PacienteDetallePage() {
                       <p className="text-sm font-medium text-muted-foreground">Dirección</p>
                       <p>{paciente.direccion || "No registrada"}</p>
                     </div>
+                    {paciente.tratante_nombre && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Profesional Tratante</p>
+                        <p>{paciente.tratante_nombre}</p>
+                      </div>
+                    )}
                     {paciente.prevision && (
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Previsión</p>
