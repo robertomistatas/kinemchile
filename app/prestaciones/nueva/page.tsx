@@ -119,9 +119,12 @@ export default function NuevaSesionPage() {
     }
 
     try {
-      // Convertir la fecha a timestamp
-      const fechaTimestamp = new Date(formData.fecha).getTime()
-      console.log("Fecha convertida a timestamp:", fechaTimestamp)
+      // Corregir desfase de zona horaria: guardar la fecha a las 12:00 hora local
+      const [year, month, day] = formData.fecha.split("-").map(Number)
+      // month - 1 porque en JS los meses van de 0 a 11
+      const fechaLocal = new Date(year, month - 1, day, 12, 0, 0, 0)
+      const fechaTimestamp = fechaLocal.getTime()
+      console.log("Fecha convertida a timestamp (12:00 local):", fechaTimestamp)
 
       const sesionData = {
         fecha: fechaTimestamp,
