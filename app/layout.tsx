@@ -17,9 +17,10 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  // Evitar clases dinámicas en SSR para prevenir hydration mismatch
   return (
-    <html lang="es">
-      <body className={inter.className}>
+    <html lang="es" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <ClientWrapper>{children}</ClientWrapper>
         </ThemeProvider>

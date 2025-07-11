@@ -12,77 +12,80 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 export default function DashboardPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+  // Todos los hooks deben ir antes de cualquier return condicional
+  const { user, userInfo, loading } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalPacientes: 0,
     pacientesActivos: 0,
     totalSesiones: 0,
     sesionesMes: 0,
-  })
-  const [dataLoading, setDataLoading] = useState(true)
-  const [proximasCitas, setProximasCitas] = useState<any[]>([])
+  });
+  const [dataLoading, setDataLoading] = useState(true);
+  const [proximasCitas, setProximasCitas] = useState<any[]>([]);
+  const [saludo, setSaludo] = useState<string>("");
+
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/login")
+      router.push("/login");
     }
-  }, [user, loading, router])
-  
+  }, [user, loading, router]);
+
   useEffect(() => {
     async function fetchData() {
       try {
-        setDataLoading(true)
-        const ahora = new Date()
-        
-        // Obtener pacientes, sesiones y citas del día actual
+        setDataLoading(true);
+        const ahora = new Date();
         const [pacientes, sesiones, citasHoy] = await Promise.all([
-          getPacientes(), 
+          getPacientes(),
           getSesiones(),
-          getCitasPorFecha(ahora)
-        ])
+          getCitasPorFecha(ahora),
+        ]);
+        // Filtrar según el rol del usuario
+        let citasFiltradas = citasHoy;
+        let sesionesFiltradas = sesiones;
+        let pacientesFiltrados = pacientes;
+        if (userInfo && userInfo.rol === "kinesiologa") {
+          // Solo citas/sesiones donde el profesional es el usuario logueado
+          citasFiltradas = citasHoy.filter((c: any) =>
+            c.profesional_id === userInfo.id || c.profesional_nombre === userInfo.nombre
+          );
+          sesionesFiltradas = sesiones.filter((s: any) =>
+            s.kinesiologo_id === userInfo.id || s.kinesiologo_nombre === userInfo.nombre
+          );
+          pacientesFiltrados = pacientes.filter((p: any) =>
+            p.tratante_id === userInfo.id || p.tratante_nombre === userInfo.nombre
+          );
+        }
 
-        console.log('Dashboard - Citas obtenidas del día:', citasHoy.length)
-
-        const pacientesActivos = pacientes.filter((p: any) => p.activo).length
-
-        // Calcular sesiones del mes actual
-        const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1)
-        const sesionesMes = sesiones.filter((s: Sesion) => {
-          const fechaSesion = new Date(s.fecha)
-          return fechaSesion >= inicioMes
-        }).length
+        const pacientesActivos = pacientesFiltrados.filter((p: any) => p.activo).length;
+        const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+        const sesionesMes = sesionesFiltradas.filter((s: Sesion) => {
+          const fechaSesion = new Date(s.fecha);
+          return fechaSesion >= inicioMes;
+        }).length;
 
         // Formatear las citas para mostrarlas en el dashboard
-        const citasFormateadas = citasHoy.map((cita: any) => {
-          // Extraer hora de la fecha de la cita
-          let hora = "Sin hora"
+        const citasFormateadas = citasFiltradas.map((cita: any) => {
+          let hora = "Sin hora";
           if (cita.fecha) {
-            const fechaObj = typeof cita.fecha === 'number' 
-              ? new Date(cita.fecha) 
-              : typeof cita.fecha === 'string' 
+            const fechaObj = typeof cita.fecha === 'number'
+              ? new Date(cita.fecha)
+              : typeof cita.fecha === 'string'
                 ? new Date(cita.fecha)
-                : cita.fecha.toDate 
-                  ? cita.fecha.toDate() 
-                  : new Date()
-            
-            hora = fechaObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+                : cita.fecha.toDate
+                  ? cita.fecha.toDate()
+                  : new Date();
+            hora = fechaObj.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
           }
-
-          // Formatear nombre del paciente
-          // Primero intentamos con campos específicos de paciente
-          let nombrePaciente = ''
-          
+          let nombrePaciente = '';
           if (cita.paciente_nombre) {
             nombrePaciente = `${cita.paciente_nombre || ''} ${cita.paciente_apellido || ''}`
           } else if (cita.paciente && typeof cita.paciente === 'object') {
-            // Si no hay campos específicos, revisamos si hay un objeto paciente
             nombrePaciente = `${cita.paciente.nombre || ''} ${cita.paciente.apellido || ''}`
           }
-          
-          // Determinar el profesional
-          const profesional = cita.profesional_nombre || 
-                            (cita.profesional_id ? 'Prof. ID: ' + cita.profesional_id : 'Sin asignar')
-          
+          const profesional = cita.profesional_nombre ||
+            (cita.profesional_id ? 'Prof. ID: ' + cita.profesional_id : 'Sin asignar')
           return {
             id: cita.id,
             paciente: nombrePaciente.trim() || 'Paciente sin nombre',
@@ -91,20 +94,12 @@ export default function DashboardPage() {
             profesional: profesional
           }
         })
-
-        // Ordenar las citas por hora
-        citasFormateadas.sort((a: any, b: any) => {
-          return a.hora.localeCompare(b.hora)
-        })
-        
-        console.log('Dashboard - Citas formateadas:', citasFormateadas.length)
-
-        // Actualizar el estado
+        citasFormateadas.sort((a: any, b: any) => a.hora.localeCompare(b.hora))
         setProximasCitas(citasFormateadas)
         setStats({
-          totalPacientes: pacientes.length,
+          totalPacientes: pacientesFiltrados.length,
           pacientesActivos,
-          totalSesiones: sesiones.length,
+          totalSesiones: sesionesFiltradas.length,
           sesionesMes,
         })
       } catch (error) {
@@ -113,22 +108,29 @@ export default function DashboardPage() {
         setDataLoading(false)
       }
     }
-
-    if (user) {
+    if (user && userInfo) {
       fetchData()
     }
-  }, [user])
+  }, [user, userInfo])
 
-  if (loading || !user) {
-    return null
+  useEffect(() => {
+    // Saludo personalizado solo en cliente para evitar hydration mismatch
+    const hora = new Date().getHours();
+    if (hora < 12) setSaludo("Buenos días");
+    else if (hora < 20) setSaludo("Buenas tardes");
+    else setSaludo("Buenas noches");
+  }, []);
+
+  if (loading || !user || !userInfo) {
+    return null;
   }
 
   return (
     <Layout>
       <div className="flex flex-col gap-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Bienvenido al sistema de gestión de Kinem Chile</p>
+          <h1 className="text-3xl font-bold tracking-tight">{saludo && userInfo ? `${saludo}, ${userInfo.nombre}` : "Dashboard"}</h1>
+          <p className="text-muted-foreground">Este es tu panel de gestión personalizado</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

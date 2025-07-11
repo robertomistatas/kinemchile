@@ -561,6 +561,12 @@ export default function PacienteDetallePage() {
                       <p>
                         {paciente.nombre} {paciente.apellido}
                       </p>
+                      <p className="text-sm font-medium text-muted-foreground mt-2">Fecha de Ingreso</p>
+                      <p>{paciente.fechaIngreso || <span className="text-muted-foreground">No registrada</span>}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Fecha de Ingreso</p>
+                      <p>{paciente.fechaIngreso || <span className="text-muted-foreground">No registrada</span>}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">RUT</p>

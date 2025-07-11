@@ -16,6 +16,7 @@ import { useAuth } from "@/context/auth-context"
 import { crearPaciente } from "@/lib/firestore"
 import Link from "next/link"
 import { validarRut, formatearRut } from "@/lib/utils"
+import { CalendarInput } from "./CalendarInput"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 // Añadir estas importaciones
 import { getProfesionales } from "@/lib/firestore-service"
@@ -42,6 +43,7 @@ export default function NuevoPacientePage() {
     genero: "",
     prevision: "",
     tratante_id: "",
+    fechaIngreso: "", // Nuevo campo
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -152,6 +154,7 @@ export default function NuevoPacientePage() {
         tratante_id: formData.tratante_id,
         tratante_nombre: profesionalSeleccionado ? profesionalSeleccionado.nombre : "",
         tratante_funcion: profesionalSeleccionado ? profesionalSeleccionado.funcion : "",
+        fechaIngreso: formData.fechaIngreso || undefined,
       })
 
       router.push(`/pacientes/${pacienteId}`)
@@ -328,16 +331,25 @@ export default function NuevoPacientePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="direccion">Dirección</Label>
-                    <Input
-                      id="direccion"
-                      name="direccion"
-                      value={formData.direccion}
-                      onChange={handleChange}
-                      placeholder="Dirección del paciente"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fechaIngreso">Fecha de Ingreso</Label>
+                  <DateComboInput
+                    id="fechaIngreso"
+                    value={formData.fechaIngreso}
+                    onChange={(val) => setFormData({ ...formData, fechaIngreso: val })}
+                    placeholder="DD-MM-AAAA"
+                  />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="direccion">Dirección</Label>
+                  <Input
+                    id="direccion"
+                    name="direccion"
+                    value={formData.direccion}
+                    onChange={handleChange}
+                    placeholder="Dirección del paciente"
+                  />
+                </div>
                 </div>
               </CardContent>
             </Card>

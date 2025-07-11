@@ -38,7 +38,6 @@ export async function getPacientes(): Promise<Paciente[]> {
 
     return snapshot.docs.map((doc) => {
       const data = doc.data()
-
       // Asegurarse de que todos los campos requeridos existan
       return {
         id: doc.id,
@@ -58,6 +57,7 @@ export async function getPacientes(): Promise<Paciente[]> {
         prevision: data.prevision || "",
         kinesiologo_id: data.kinesiologo_id || null,
         kinesiologo_nombre: data.kinesiologo_nombre || null,
+        fechaIngreso: data.fechaIngreso || "",
       } as Paciente
     })
   } catch (error) {
@@ -159,6 +159,7 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         updatedAt: data.updatedAt || null,
         kinesiologo_id: data.kinesiologo_id || null,
         kinesiologo_nombre: data.kinesiologo_nombre || null,
+        fechaIngreso: data.fechaIngreso || "",
       }
 
       return paciente

@@ -26,6 +26,7 @@ export interface Paciente {
   updatedAt?: string
   evaluacionInicial?: string
   evaluacionFinal?: string
+  fechaIngreso?: string // Formato DD-MM-AAAA
 }
 
 export interface Sesion {

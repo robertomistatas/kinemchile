@@ -42,6 +42,14 @@ export function Layout({ children }: LayoutProps) {
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Pacientes", href: "/pacientes", icon: Users },
     { name: "Agenda", href: "/agenda", icon: Calendar },
+    // Mostrar "Configuración" solo para admin o superadmin
+    ...(user && (user.rol === "admin" || user.rol === "superadmin")
+      ? [
+          { name: "Configuración", href: "/configuracion", icon: Settings },
+          // Si quieres mantener el acceso a /admin, descomenta la siguiente línea:
+          // { name: "Administración", href: "/admin", icon: Settings },
+        ]
+      : []),
   ]
 
   return (

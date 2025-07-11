@@ -16,8 +16,10 @@ import { useAuth } from "@/context/auth-context"
 import { getPaciente, actualizarPaciente } from "@/lib/firestore"
 import Link from "next/link"
 import { validarRut, formatearRut } from "@/lib/utils"
+
 import type { Paciente } from "@/lib/data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DateComboInput } from "@/components/ui/date-combo-input"
 
 export default function EditarPacientePage() {
   const { user, loading } = useAuth()
@@ -42,6 +44,7 @@ export default function EditarPacientePage() {
     edad: "",
     genero: "",
     prevision: "",
+    fechaIngreso: "", // Nuevo campo
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -79,6 +82,7 @@ export default function EditarPacientePage() {
             edad: pacienteData.edad || "",
             genero: pacienteData.genero || "",
             prevision: pacienteData.prevision || "",
+            fechaIngreso: pacienteData.fechaIngreso || "",
           })
         } else {
           setGeneralError("No se encontró el paciente")
@@ -176,6 +180,7 @@ export default function EditarPacientePage() {
         edad: formData.edad,
         genero: formData.genero,
         prevision: formData.prevision,
+        fechaIngreso: formData.fechaIngreso || undefined,
         updatedAt: Date.now(),
       })
 
@@ -337,6 +342,15 @@ export default function EditarPacientePage() {
                         <SelectItem value="otro">Otro</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaIngreso">Fecha de Ingreso</Label>
+                    <DateComboInput
+                      id="fechaIngreso"
+                      value={formData.fechaIngreso}
+                      onChange={(val) => setFormData({ ...formData, fechaIngreso: val })}
+                      placeholder="DD-MM-AAAA"
+                    />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="direccion">Dirección</Label>

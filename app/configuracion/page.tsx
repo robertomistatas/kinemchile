@@ -48,8 +48,8 @@ export default function ConfiguracionPage() {
   const [submitting, setSubmitting] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
 
-  // Solo permitir acceso a roberto@mistatas.com inicialmente
-  const isAuthorized = user?.email === "roberto@mistatas.com"
+  // Solo permitir acceso a roberto@mistatas.com y palomakinem@gmail.com
+  const isAuthorized = user?.email === "roberto@mistatas.com" || user?.email === "palomakinem@gmail.com"
 
   useEffect(() => {
     if (!loading && !user) {
