@@ -18,8 +18,8 @@ export interface Paciente {
   tratante_id?: string // ID del profesional tratante
   tratante_nombre?: string // Nombre del profesional tratante
   tratante_funcion?: string // Función del profesional tratante (kinesiologa, medico)
-  kinesiologo_id?: string
-  kinesiologo_nombre?: string
+  kinesiologo_id?: string | null
+  kinesiologo_nombre?: string | null
   fechaAlta?: string | null
   notasAlta?: string | null
   createdAt?: string

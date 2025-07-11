@@ -31,6 +31,7 @@ export default function PacientesPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [pacienteAEliminar, setPacienteAEliminar] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [verTodos, setVerTodos] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -44,11 +45,11 @@ export default function PacientesPage() {
         setDataLoading(true)
 
         let data
-        // Si el usuario es profesional, cargar solo sus pacientes
-        if (userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional") {
+        // Si el usuario es profesional y no está en modo verTodos, cargar solo sus pacientes
+        if (!verTodos && (userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional")) {
           data = (await getPacientes()).filter((p) => p.tratante_id === userInfo.id)
         } else {
-          // Si es admin o recepcionista, cargar todos los pacientes
+          // Si es admin, recepcionista o está en modo verTodos, cargar todos los pacientes
           data = await getPacientes()
         }
 
@@ -64,17 +65,19 @@ export default function PacientesPage() {
     if (user) {
       fetchPacientes()
     }
-  }, [user, userInfo])
+  }, [user, userInfo, verTodos])
 
-  // Filtrar pacientes según el término de búsqueda
-  const filteredPacientes = pacientes.filter(
-    (paciente) =>
-      paciente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      paciente.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      paciente.rut.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (paciente.email && paciente.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (paciente.telefono && paciente.telefono.toLowerCase().includes(searchTerm.toLowerCase())),
-  )
+  // Filtrar solo pacientes activos y según el término de búsqueda
+  const filteredPacientes = pacientes
+    .filter((paciente) => paciente.activo) // Mostrar solo activos
+    .filter(
+      (paciente) =>
+        paciente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        paciente.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        paciente.rut.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (paciente.email && paciente.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (paciente.telefono && paciente.telefono.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
 
   const handleEliminarPaciente = (id: string) => {
     setPacienteAEliminar(id)
@@ -108,17 +111,28 @@ export default function PacientesPage() {
   return (
     <Layout>
       <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Botón para alternar entre ver todos o solo asignados */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Pacientes</h1>
             <p className="text-sm text-muted-foreground">Mayo 2025 - Listado de pacientes</p>
           </div>
-          <Button asChild>
-            <Link href="/pacientes/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Paciente
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            {(userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional") && (
+              <Button
+                variant={verTodos ? "secondary" : "outline"}
+                onClick={() => setVerTodos((v) => !v)}
+              >
+                {verTodos ? "Ver solo mis pacientes" : "Ver todos los pacientes"}
+              </Button>
+            )}
+            <Button asChild>
+              <Link href="/pacientes/nuevo">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Paciente
+              </Link>
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
