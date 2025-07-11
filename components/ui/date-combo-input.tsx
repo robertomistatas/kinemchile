@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -30,8 +30,7 @@ export type DateComboInputProps = {
 
 export const DateComboInput: React.FC<DateComboInputProps> = ({ id, value, onChange, placeholder }) => {
   const [inputValue, setInputValue] = React.useState(value || "");
-  const [calendarOpen, setCalendarOpen] = React.useState(false);
-  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(parseDate(value));
+  const [selectedDate, setSelectedDate] = React.useState<Date | null>(parseDate(value) ?? null);
 
   React.useEffect(() => {
     setInputValue(value || "");
@@ -52,14 +51,11 @@ export const DateComboInput: React.FC<DateComboInputProps> = ({ id, value, onCha
     }
   };
 
-  const handleCalendarSelect = (date?: Date) => {
-    if (date) {
-      const formatted = formatDate(date);
-      setInputValue(formatted);
-      setSelectedDate(date);
-      onChange?.(formatted);
-      setCalendarOpen(false);
-    }
+  const handleDatePickerChange = (date: Date | null) => {
+    setSelectedDate(date);
+    const formatted = formatDate(date);
+    setInputValue(formatted);
+    onChange?.(formatted);
   };
 
   return (
@@ -73,8 +69,10 @@ export const DateComboInput: React.FC<DateComboInputProps> = ({ id, value, onCha
           maxLength={10}
           autoComplete="off"
         />
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
+        <DatePicker
+          selected={selectedDate}
+          onChange={handleDatePickerChange}
+          customInput={
             <Button
               type="button"
               variant="ghost"
@@ -85,26 +83,12 @@ export const DateComboInput: React.FC<DateComboInputProps> = ({ id, value, onCha
             >
               <CalendarIcon className="h-5 w-5 text-muted-foreground" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-auto p-0">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleCalendarSelect}
-              initialFocus
-            />
-            <div className="flex justify-end p-2">
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => {
-                  if (selectedDate) handleCalendarSelect(selectedDate);
-                  else setCalendarOpen(false);
-                }}
-              >Aceptar</Button>
-            </div>
-          </PopoverContent>
-        </Popover>
+          }
+          dateFormat="dd-MM-yyyy"
+          popperPlacement="bottom-end"
+          showPopperArrow={false}
+          calendarClassName="z-50"
+        />
       </div>
       <span className="text-xs text-muted-foreground">Puedes escribir la fecha o seleccionarla en el calendario</span>
     </div>

@@ -4,7 +4,8 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import DatePicker from "react-datepicker"
+import "react-datepicker/dist/react-datepicker.css"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
@@ -674,7 +675,18 @@ export default function AgendaPage() {
               <CardDescription>Selecciona una fecha para ver las citas</CardDescription>
             </CardHeader>
             <CardContent>
-              <Calendar mode="single" selected={date} onSelect={setDate} className="rounded-md border" initialFocus />
+              <div className="flex flex-col gap-2">
+                <DatePicker
+                  selected={date}
+                  onChange={setDate}
+                  dateFormat="dd-MM-yyyy"
+                  className="rounded-md border w-full px-3 py-2"
+                  popperPlacement="bottom-end"
+                  showPopperArrow={false}
+                  calendarClassName="z-50"
+                />
+                <span className="text-xs text-muted-foreground">Selecciona una fecha en el calendario</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -1001,12 +1013,15 @@ export default function AgendaPage() {
                       <div className="space-y-2">
                         <Label htmlFor="fecha">Fecha</Label>
                         <div className="rounded-md border">
-                          <Calendar
-                            mode="single"
+                          <DatePicker
                             selected={formData.fecha}
-                            onSelect={handleDateChange}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                            initialFocus
+                            onChange={handleDateChange}
+                            dateFormat="dd-MM-yyyy"
+                            className="w-full px-3 py-2"
+                            minDate={new Date(new Date().setHours(0, 0, 0, 0))}
+                            popperPlacement="bottom-end"
+                            showPopperArrow={false}
+                            calendarClassName="z-50"
                           />
                         </div>
                       </div>
