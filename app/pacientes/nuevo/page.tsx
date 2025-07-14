@@ -6,6 +6,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { DateComboInput } from "@/components/ui/date-combo-input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -236,12 +237,11 @@ export default function NuevoPacientePage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
-                    <Input
+                    <DateComboInput
                       id="fechaNacimiento"
-                      name="fechaNacimiento"
-                      type="date"
                       value={formData.fechaNacimiento}
-                      onChange={handleChange}
+                      onChange={(val) => setFormData({ ...formData, fechaNacimiento: val })}
+                      placeholder="DD-MM-AAAA"
                     />
                   </div>
                   <div className="space-y-2">
