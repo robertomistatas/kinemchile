@@ -1100,28 +1100,34 @@ export default function PacienteDetallePage() {
           <TabsContent value="sesiones" className="space-y-4 print:hidden">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold tracking-tight">Historial de Sesiones</h2>
-              {sesiones.length > 0 && (
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={toggleOrdenSesiones}
-                    className="bg-blue-50 hover:bg-blue-100"
-                  >
-                    📅 Fecha {ordenSesiones === 'asc' ? '↑' : '↓'}
-                  </Button>
-                  <div className="text-xs text-muted-foreground self-center">
-                    {sesiones.length} sesiones
-                  </div>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleAddSesion} 
+                  className="no-print bg-blue-600 hover:bg-blue-700 text-white border-0 shadow-sm"
+                >
+                  ➕ Añadir Sesión
+                </Button>
+                {sesiones.length > 0 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={toggleOrdenSesiones}
+                      className="bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-300 dark:border-slate-600"
+                    >
+                      📅 Fecha {ordenSesiones === 'asc' ? '↑' : '↓'}
+                    </Button>
+                    <div className="text-xs text-muted-foreground self-center">
+                      {sesiones.length} sesiones
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
             {sesiones.length === 0 && !tieneSesionesEnObjeto ? (
               <div className="rounded-md border p-8 text-center">
                 <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
-                <Button className="mt-4 no-print" onClick={handleAddSesion}>
-                  Añadir Sesión
-                </Button>
+                <p className="text-sm text-muted-foreground mt-2">Usa el botón "Añadir Sesión" arriba para comenzar.</p>
               </div>
             ) : (
               <>
@@ -1204,11 +1210,6 @@ export default function PacienteDetallePage() {
                         ))}
                       </TableBody>
                     </Table>
-                    <div className="p-4 flex justify-end">
-                      <Button onClick={handleAddSesion} className="no-print">
-                        Añadir Sesión
-                      </Button>
-                    </div>
                   </div>
                 )}
 
