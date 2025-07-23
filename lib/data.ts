@@ -27,15 +27,21 @@ export interface Paciente {
   evaluacionInicial?: string
   evaluacionFinal?: string
   fechaIngreso?: string // Formato DD-MM-AAAA
+  edad?: string
+  genero?: string
+  examenesAuxiliares?: string
+  fechaInicio?: string
+  sesiones?: any[] // Para compatibilidad con datos legacy
 }
 
 export interface Sesion {
   id?: string
   pacienteId: string
-  fecha: string
+  fecha: string | number  // Puede ser timestamp número o string de fecha
   hora: string
   duracion: number
   estado: string
+  tipo?: string  // Tipo de sesión: Evaluación, Reevaluación, Tratamiento, Control
   notas: string
   createdAt?: string
   updatedAt?: string
@@ -116,6 +122,7 @@ export const PERMISOS = {
   CREAR_USUARIO: "crear_usuario",
   EDITAR_USUARIO: "editar_usuario",
   ELIMINAR_USUARIO: "eliminar_usuario",
+  PACIENTES_ASIGNAR_KINESIOLOGO: "pacientes_asignar_kinesiologo",
 
   // Configuración
   ACCESO_CONFIGURACION: "acceso_configuracion",

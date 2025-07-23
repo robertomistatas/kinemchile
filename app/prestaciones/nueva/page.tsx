@@ -18,6 +18,7 @@ import type { Paciente } from "@/lib/data"
 import Link from "next/link"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PacienteCombobox } from "@/components/paciente-combobox"
+import { DateComboInput } from "@/components/ui/date-combo-input"
 
 export default function NuevaSesionPage() {
   const { user, loading } = useAuth()
@@ -30,7 +31,7 @@ export default function NuevaSesionPage() {
   const [selectedPacienteId, setSelectedPacienteId] = useState<string>(pacienteIdParam || "")
   const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null)
   const [formData, setFormData] = useState({
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: new Date().toLocaleDateString("es-CL").split("/").join("-"), // Formato DD-MM-AAAA
     tipo: tipoParam || "Evaluación",
     notas: "",
   })
@@ -119,12 +120,12 @@ export default function NuevaSesionPage() {
     }
 
     try {
-      // Corregir desfase de zona horaria: guardar la fecha a las 12:00 hora local
-      const [year, month, day] = formData.fecha.split("-").map(Number)
+      // Convertir fecha DD-MM-AAAA a timestamp a las 12:00 hora local
+      const [day, month, year] = formData.fecha.split("-").map(Number)
       // month - 1 porque en JS los meses van de 0 a 11
       const fechaLocal = new Date(year, month - 1, day, 12, 0, 0, 0)
       const fechaTimestamp = fechaLocal.getTime()
-      console.log("Fecha convertida a timestamp (12:00 local):", fechaTimestamp)
+      console.log("Fecha DD-MM-AAAA:", formData.fecha, "convertida a timestamp (12:00 local):", fechaTimestamp)
 
       const sesionData = {
         fecha: fechaTimestamp,
@@ -227,14 +228,11 @@ export default function NuevaSesionPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="fecha">Fecha</Label>
-                <Input
+                <DateComboInput
                   id="fecha"
-                  name="fecha"
-                  type="date"
                   value={formData.fecha}
-                  onChange={handleInputChange}
-                  disabled={submitting || success}
-                  required
+                  onChange={(value) => setFormData({ ...formData, fecha: value })}
+                  placeholder="DD-MM-AAAA"
                 />
               </div>
 

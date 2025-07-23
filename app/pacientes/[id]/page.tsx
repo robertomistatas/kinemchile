@@ -11,7 +11,7 @@ import { getPaciente, getSesionesPaciente, actualizarPaciente } from "@/lib/fire
 import type { Paciente, Sesion, Usuario } from "@/lib/data"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit } from "lucide-react"
+import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit, Save, X } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -25,20 +25,10 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { jsPDF } from "jspdf"
 import "jspdf-autotable"
-
-// Añadir estas importaciones
+import { DateComboInput } from "@/components/ui/date-combo-input"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { asignarKinesiologoAPaciente, getUsuarios } from "@/lib/firestore"
-import { PERMISOS } from "@/lib/data"
-import { PermissionGate } from "@/components/permission-gate"
-
-// Importar el componente de depuración
-import { DebugSesiones } from "@/components/debug-sesiones"
-import { DebugPaciente } from "@/components/debug-paciente"
-
-// Añadir estas importaciones
-import { asignarTratanteAPaciente, getProfesionales } from "@/lib/firestore-service"
 
 export default function PacienteDetallePage() {
   const { user, loading } = useAuth()
@@ -54,18 +44,16 @@ export default function PacienteDetallePage() {
   const [showAltaDialog, setShowAltaDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("informacion")
 
-  // Dentro del componente PacienteDetallePage, añadir estos estados
-  const [kinesiologo, setKinesiologo] = useState("")
-  const [kinesiolocos, setKinesiologos] = useState<Usuario[]>([])
-  const [asignandoKinesiologo, setAsignandoKinesiologo] = useState(false)
+  // Estados para edición de sesiones
+  const [editingSesionId, setEditingSesionId] = useState<string | null>(null)
+  const [editingSesionData, setEditingSesionData] = useState<{ fecha: string; notas: string } | null>(null)
+  const [savingSesion, setSavingSesion] = useState(false)
+  
+  // Estados para ordenamiento
+  const [ordenSesiones, setOrdenSesiones] = useState<'asc' | 'desc'>('desc') // Más recientes primero
+  const [ordenEvaluaciones, setOrdenEvaluaciones] = useState<'asc' | 'desc'>('desc')
 
-  const [tratante, setTratante] = useState("")
-  const [profesionales, setProfesionales] = useState<Usuario[]>([])
-  const [asignandoTratante, setAsignandoTratante] = useState(false)
   const [success, setSuccess] = useState("")
-
-  // Añadir este estado para mensajes de éxito
-  // const [success, setSuccess] = useState("")
 
   useEffect(() => {
     if (!loading && !user) {
@@ -113,7 +101,7 @@ export default function PacienteDetallePage() {
       }
     } catch (error) {
       console.error("Error al cargar datos:", error)
-      setError(`No se pudo cargar la información del paciente: ${error.message || "Error desconocido"}`)
+      setError(`No se pudo cargar la información del paciente: ${error instanceof Error ? error.message : "Error desconocido"}`)
     } finally {
       setDataLoading(false)
       setRefreshing(false)
@@ -126,108 +114,90 @@ export default function PacienteDetallePage() {
     }
   }, [user, id])
 
-  // Añadir este useEffect para cargar los kinesiólogos
-  useEffect(() => {
-    async function fetchKinesiologos() {
-      try {
-        const usuarios = await getUsuarios()
-        // Filtrar solo los usuarios con rol de kinesiólogo
-        const kinesiologos = usuarios.filter((u) => u.rol === "kinesiologo")
-        setKinesiologos(kinesiologos)
-
-        // Si el paciente tiene un kinesiólogo asignado, seleccionarlo
-        if (paciente?.kinesiologo_id) {
-          setKinesiologo(paciente.kinesiologo_id)
-        }
-      } catch (error) {
-        console.error("Error al cargar kinesiólogos:", error)
-      }
+  // Funciones para editar sesiones
+  const handleEditSesion = (sesion: Sesion) => {
+    setEditingSesionId(sesion.id!)
+    
+    // Convertir timestamp a formato DD-MM-AAAA para la edición
+    let fechaFormateada = ""
+    if (typeof sesion.fecha === "number") {
+      const date = new Date(sesion.fecha)
+      fechaFormateada = date.toLocaleDateString("es-CL").split("/").join("-")
+    } else if (typeof sesion.fecha === "string") {
+      fechaFormateada = sesion.fecha
     }
+    
+    setEditingSesionData({
+      fecha: fechaFormateada,
+      notas: sesion.notas || ""
+    })
+  }
 
-    if (user && paciente) {
-      fetchKinesiologos()
-    }
-  }, [user, paciente])
+  const handleCancelEdit = () => {
+    setEditingSesionId(null)
+    setEditingSesionData(null)
+  }
 
-  // Añadir este useEffect para cargar los profesionales
-  useEffect(() => {
-    async function fetchProfesionales() {
-      try {
-        const profesionalesData = await getProfesionales()
-        setProfesionales(profesionalesData)
-
-        // Si el paciente tiene un tratante asignado, seleccionarlo
-        if (paciente?.tratante_id) {
-          setTratante(paciente.tratante_id)
-        }
-      } catch (error) {
-        console.error("Error al cargar profesionales:", error)
-      }
-    }
-
-    if (user && paciente) {
-      fetchProfesionales()
-    }
-  }, [user, paciente])
-
-  // Añadir esta función para manejar la asignación de kinesiólogo
-  const handleAsignarKinesiologo = async () => {
-    if (!kinesiologo) return
+  const handleSaveSesion = async (sesionId: string) => {
+    if (!editingSesionData) return
 
     try {
-      setAsignandoKinesiologo(true)
+      setSavingSesion(true)
+      
+      // Convertir fecha DD-MM-AAAA a timestamp
+      const [day, month, year] = editingSesionData.fecha.split("-").map(Number)
+      const fechaLocal = new Date(year, month - 1, day, 12, 0, 0, 0)
+      const fechaTimestamp = fechaLocal.getTime()
 
-      // Encontrar el nombre del kinesiólogo seleccionado
-      const kinesiologoSeleccionado = kinesiolocos.find((k) => k.id === kinesiologo)
-      const kinesiologoNombre = kinesiologoSeleccionado ? kinesiologoSeleccionado.nombre : ""
+      // Importar y usar función de actualización 
+      const { actualizarSesion } = await import("@/lib/firestore-service")
+      
+      await actualizarSesion(sesionId, {
+        fecha: fechaTimestamp,
+        notas: editingSesionData.notas
+      } as any)
 
-      await asignarKinesiologoAPaciente(id, kinesiologo, kinesiologoNombre)
+      // Actualizar estado local
+      setSesiones(prev => prev.map(s => 
+        s.id === sesionId 
+          ? { ...s, fecha: fechaTimestamp, notas: editingSesionData.notas } as Sesion
+          : s
+      ))
+      
+      setEvaluaciones(prev => prev.map(e => 
+        e.id === sesionId 
+          ? { ...e, fecha: fechaTimestamp, notas: editingSesionData.notas } as Sesion
+          : e
+      ))
 
-      // Actualizar el paciente en el estado local
-      setPaciente({
-        ...paciente,
-        kinesiologo_id: kinesiologo,
-        kinesiologo_nombre: kinesiologoNombre,
-      })
-
-      // Mostrar mensaje de éxito
-      setSuccess("Kinesiólogo asignado correctamente")
-      setTimeout(() => setSuccess(""), 3000)
+      // Limpiar estado de edición
+      setEditingSesionId(null)
+      setEditingSesionData(null)
+      
     } catch (error) {
-      console.error("Error al asignar kinesiólogo:", error)
-      setError("Error al asignar kinesiólogo. Por favor, intenta nuevamente.")
+      console.error("Error al actualizar sesión:", error)
+      setError("Error al actualizar la sesión")
     } finally {
-      setAsignandoKinesiologo(false)
+      setSavingSesion(false)
     }
   }
 
-  // Añadir esta función para manejar la asignación de tratante
-  const handleAsignarTratante = async () => {
-    if (!tratante) return
+  // Funciones de ordenamiento
+  const ordenarSesiones = (sesiones: Sesion[], orden: 'asc' | 'desc') => {
+    return [...sesiones].sort((a, b) => {
+      const fechaA = typeof a.fecha === "number" ? a.fecha : new Date(a.fecha || 0).getTime()
+      const fechaB = typeof b.fecha === "number" ? b.fecha : new Date(b.fecha || 0).getTime()
+      
+      return orden === 'asc' ? fechaA - fechaB : fechaB - fechaA
+    })
+  }
 
-    try {
-      setAsignandoTratante(true)
+  const toggleOrdenSesiones = () => {
+    setOrdenSesiones(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
 
-      // Encontrar el profesional seleccionado
-      const profesionalSeleccionado = profesionales.find((p) => p.id === tratante)
-      const profesionalNombre = profesionalSeleccionado ? profesionalSeleccionado.nombre : ""
-      const profesionalFuncion = profesionalSeleccionado ? profesionalSeleccionado.funcion : ""
-
-      await asignarTratanteAPaciente(id, tratante, profesionalNombre, profesionalFuncion)
-
-      // Volver a cargar el paciente desde la base de datos para reflejar el cambio real
-      const pacienteActualizado = await getPaciente(id)
-      setPaciente(pacienteActualizado)
-
-      // Mostrar mensaje de éxito
-      setSuccess("Profesional asignado correctamente")
-      setTimeout(() => setSuccess(""), 3000)
-    } catch (error) {
-      console.error("Error al asignar profesional:", error)
-      setError("Error al asignar profesional. Por favor, intenta nuevamente.")
-    } finally {
-      setAsignandoTratante(false)
-    }
+  const toggleOrdenEvaluaciones = () => {
+    setOrdenEvaluaciones(prev => prev === 'asc' ? 'desc' : 'asc')
   }
 
   const handleRefresh = () => {
@@ -436,11 +406,6 @@ export default function PacienteDetallePage() {
           <Button asChild className="no-print">
             <Link href="/pacientes">Volver a la lista de pacientes</Link>
           </Button>
-
-          {/* Añadir componente de depuración */}
-          <div className="mt-8">
-            <DebugPaciente pacienteId={id} />
-          </div>
         </div>
       </Layout>
     )
@@ -702,7 +667,24 @@ export default function PacienteDetallePage() {
               </>
             )}
 
-            <h2 className="text-2xl font-bold tracking-tight print:mt-8 print:mb-4">Historial de Sesiones</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold tracking-tight print:mt-8 print:mb-4">Historial de Sesiones</h2>
+              {sesiones.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleOrdenSesiones}
+                    className="print:hidden bg-blue-50 hover:bg-blue-100"
+                  >
+                    📅 Ordenar {ordenSesiones === 'asc' ? '↑ Más antiguas primero' : '↓ Más recientes primero'}
+                  </Button>
+                  <div className="text-xs text-muted-foreground self-center">
+                    {sesiones.length} sesiones
+                  </div>
+                </div>
+              )}
+            </div>
             {sesiones.length === 0 && !tieneSesionesEnObjeto ? (
               <div className="rounded-md border p-8 text-center">
                 <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
@@ -717,20 +699,73 @@ export default function PacienteDetallePage() {
                           <TableHead>Fecha</TableHead>
                           <TableHead>Tipo</TableHead>
                           <TableHead>Notas</TableHead>
+                          <TableHead className="w-24">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sesiones.map((sesion) => (
+                        {ordenarSesiones(sesiones, ordenSesiones).map((sesion) => (
                           <TableRow key={sesion.id}>
                             <TableCell>
-                              {typeof sesion.fecha === "number"
-                                ? new Date(sesion.fecha).toLocaleDateString()
-                                : typeof sesion.fecha === "string"
-                                  ? sesion.fecha
-                                  : "Fecha no disponible"}
+                              {editingSesionId === sesion.id ? (
+                                <DateComboInput
+                                  value={editingSesionData?.fecha || ""}
+                                  onChange={(value) => setEditingSesionData(prev => ({ ...prev!, fecha: value }))}
+                                  placeholder="DD-MM-AAAA"
+                                />
+                              ) : (
+                                typeof sesion.fecha === "number"
+                                  ? new Date(sesion.fecha).toLocaleDateString("es-CL")
+                                  : typeof sesion.fecha === "string"
+                                    ? sesion.fecha
+                                    : "Fecha no disponible"
+                              )}
                             </TableCell>
                             <TableCell>{sesion.tipo}</TableCell>
-                            <TableCell>{sesion.notas}</TableCell>
+                            <TableCell>
+                              {editingSesionId === sesion.id ? (
+                                <Textarea
+                                  value={editingSesionData?.notas || ""}
+                                  onChange={(e) => setEditingSesionData(prev => ({ ...prev!, notas: e.target.value }))}
+                                  placeholder="Notas de la sesión"
+                                  rows={2}
+                                />
+                              ) : (
+                                sesion.notas
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingSesionId === sesion.id ? (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleSaveSesion(sesion.id!)}
+                                    disabled={savingSesion}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    💾 Guardar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                    disabled={savingSesion}
+                                    className="border-red-300 text-red-600 hover:bg-red-50"
+                                  >
+                                    ❌ Cancelar
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditSesion(sesion)}
+                                  className="bg-blue-50 hover:bg-blue-100 border-blue-300"
+                                >
+                                  ✏️ Editar
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -761,7 +796,19 @@ export default function PacienteDetallePage() {
               </>
             )}
 
-            <h2 className="text-2xl font-bold tracking-tight print:mt-8 print:mb-4">Evaluaciones Externas</h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold tracking-tight print:mt-8 print:mb-4">Evaluaciones Externas</h2>
+              {evaluaciones.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleOrdenEvaluaciones}
+                  className="print:hidden"
+                >
+                  Ordenar por fecha {ordenEvaluaciones === 'asc' ? '↑' : '↓'}
+                </Button>
+              )}
+            </div>
             {evaluaciones.length === 0 ? (
               <div className="rounded-md border p-8 text-center">
                 <p className="text-muted-foreground">No hay evaluaciones externas registradas para este paciente.</p>
@@ -774,20 +821,70 @@ export default function PacienteDetallePage() {
                       <TableHead>Fecha</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Notas</TableHead>
+                      <TableHead className="w-24">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {evaluaciones.map((evaluacion) => (
+                    {ordenarSesiones(evaluaciones, ordenEvaluaciones).map((evaluacion) => (
                       <TableRow key={evaluacion.id}>
                         <TableCell>
-                          {typeof evaluacion.fecha === "number"
-                            ? new Date(evaluacion.fecha).toLocaleDateString()
-                            : typeof evaluacion.fecha === "string"
-                              ? evaluacion.fecha
-                              : "Fecha no disponible"}
+                          {editingSesionId === evaluacion.id ? (
+                            <DateComboInput
+                              value={editingSesionData?.fecha || ""}
+                              onChange={(value) => setEditingSesionData(prev => ({ ...prev!, fecha: value }))}
+                              placeholder="DD-MM-AAAA"
+                            />
+                          ) : (
+                            typeof evaluacion.fecha === "number"
+                              ? new Date(evaluacion.fecha).toLocaleDateString("es-CL")
+                              : typeof evaluacion.fecha === "string"
+                                ? evaluacion.fecha
+                                : "Fecha no disponible"
+                          )}
                         </TableCell>
                         <TableCell>{evaluacion.tipo}</TableCell>
-                        <TableCell>{evaluacion.notas}</TableCell>
+                        <TableCell>
+                          {editingSesionId === evaluacion.id ? (
+                            <Textarea
+                              value={editingSesionData?.notas || ""}
+                              onChange={(e) => setEditingSesionData(prev => ({ ...prev!, notas: e.target.value }))}
+                              placeholder="Notas de la evaluación"
+                              rows={2}
+                            />
+                          ) : (
+                            evaluacion.notas
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingSesionId === evaluacion.id ? (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSaveSesion(evaluacion.id!)}
+                                disabled={savingSesion}
+                              >
+                                <Save className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelEdit}
+                                disabled={savingSesion}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditSesion(evaluacion)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -856,87 +953,6 @@ export default function PacienteDetallePage() {
                         <p>{paciente.prevision}</p>
                       </div>
                     )}
-                    {/* Sección de asignación de kinesiólogo */}
-                    <PermissionGate permission={PERMISOS.PACIENTES_ASIGNAR_KINESIOLOGO}>
-                      <div className="space-y-2 mt-4">
-                        <Label htmlFor="kinesiologo">Kinesiólogo Asignado</Label>
-                        <div className="flex gap-2">
-                          <Select value={kinesiologo} onValueChange={setKinesiologo} disabled={asignandoKinesiologo}>
-                            <SelectTrigger id="kinesiologo" className="flex-1">
-                              <SelectValue placeholder="Seleccionar kinesiólogo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="no-asignado">Sin asignar</SelectItem>
-                              {kinesiolocos.map((k) => (
-                                <SelectItem key={k.id} value={k.id}>
-                                  {k.nombre}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            onClick={handleAsignarKinesiologo}
-                            disabled={kinesiologo === (paciente?.kinesiologo_id || "") || asignandoKinesiologo}
-                          >
-                            {asignandoKinesiologo ? "Guardando..." : "Guardar"}
-                          </Button>
-                        </div>
-                        {paciente?.kinesiologo_nombre && (
-                          <p className="text-sm text-muted-foreground">
-                            Actualmente asignado a: <span className="font-medium">{paciente.kinesiologo_nombre}</span>
-                          </p>
-                        )}
-                        {success && <p className="text-sm text-green-600">{success}</p>}
-                      </div>
-                    </PermissionGate>
-                    {/* Sección de asignación de tratante */}
-                    <div className="space-y-2 mt-4">
-                      <Label htmlFor="tratante">Profesional Tratante</Label>
-                      <div className="flex gap-2">
-                        <Select value={tratante} onValueChange={setTratante} disabled={asignandoTratante}>
-                          <SelectTrigger id="tratante" className="flex-1">
-                            <SelectValue placeholder="Seleccionar profesional" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="no-asignado">Sin asignar</SelectItem>
-                            {profesionales.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.nombre} (
-                                {p.funcion === "kinesiologa"
-                                  ? "Kinesióloga"
-                                  : p.funcion === "medico"
-                                    ? "Médico"
-                                    : p.funcion}
-                                )
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          onClick={handleAsignarTratante}
-                          disabled={tratante === (paciente?.tratante_id || "") || asignandoTratante}
-                        >
-                          {asignandoTratante ? "Guardando..." : "Guardar"}
-                        </Button>
-                      </div>
-                      {paciente?.tratante_nombre && (
-                        <p className="text-sm text-muted-foreground">
-                          Actualmente asignado a: <span className="font-medium">{paciente.tratante_nombre}</span>
-                          {paciente.tratante_funcion && (
-                            <span className="ml-1">
-                              (
-                              {paciente.tratante_funcion === "kinesiologa"
-                                ? "Kinesióloga"
-                                : paciente.tratante_funcion === "medico"
-                                  ? "Médico"
-                                  : paciente.tratante_funcion}
-                              )
-                            </span>
-                          )}
-                        </p>
-                      )}
-                      {success && <p className="text-sm text-green-600">{success}</p>}
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1082,7 +1098,24 @@ export default function PacienteDetallePage() {
           </TabsContent>
 
           <TabsContent value="sesiones" className="space-y-4 print:hidden">
-            <h2 className="text-2xl font-bold tracking-tight hidden print:block print:mb-4">Historial de Sesiones</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold tracking-tight">Historial de Sesiones</h2>
+              {sesiones.length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleOrdenSesiones}
+                    className="bg-blue-50 hover:bg-blue-100"
+                  >
+                    📅 Fecha {ordenSesiones === 'asc' ? '↑' : '↓'}
+                  </Button>
+                  <div className="text-xs text-muted-foreground self-center">
+                    {sesiones.length} sesiones
+                  </div>
+                </div>
+              )}
+            </div>
             {sesiones.length === 0 && !tieneSesionesEnObjeto ? (
               <div className="rounded-md border p-8 text-center">
                 <p className="text-muted-foreground">No hay sesiones registradas para este paciente.</p>
@@ -1100,20 +1133,73 @@ export default function PacienteDetallePage() {
                           <TableHead>Fecha</TableHead>
                           <TableHead>Tipo</TableHead>
                           <TableHead>Notas</TableHead>
+                          <TableHead className="w-24">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sesiones.map((sesion) => (
+                        {ordenarSesiones(sesiones, ordenSesiones).map((sesion) => (
                           <TableRow key={sesion.id}>
                             <TableCell>
-                              {typeof sesion.fecha === "number"
-                                ? new Date(sesion.fecha).toLocaleDateString()
-                                : typeof sesion.fecha === "string"
-                                  ? sesion.fecha
-                                  : "Fecha no disponible"}
+                              {editingSesionId === sesion.id ? (
+                                <DateComboInput
+                                  value={editingSesionData?.fecha || ""}
+                                  onChange={(value) => setEditingSesionData(prev => ({ ...prev!, fecha: value }))}
+                                  placeholder="DD-MM-AAAA"
+                                />
+                              ) : (
+                                typeof sesion.fecha === "number"
+                                  ? new Date(sesion.fecha).toLocaleDateString("es-CL")
+                                  : typeof sesion.fecha === "string"
+                                    ? sesion.fecha
+                                    : "Fecha no disponible"
+                              )}
                             </TableCell>
                             <TableCell>{sesion.tipo}</TableCell>
-                            <TableCell>{sesion.notas}</TableCell>
+                            <TableCell>
+                              {editingSesionId === sesion.id ? (
+                                <Textarea
+                                  value={editingSesionData?.notas || ""}
+                                  onChange={(e) => setEditingSesionData(prev => ({ ...prev!, notas: e.target.value }))}
+                                  placeholder="Notas de la sesión"
+                                  rows={2}
+                                />
+                              ) : (
+                                sesion.notas
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {editingSesionId === sesion.id ? (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={() => handleSaveSesion(sesion.id!)}
+                                    disabled={savingSesion}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    💾 Guardar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                    disabled={savingSesion}
+                                    className="border-red-300 text-red-600 hover:bg-red-50"
+                                  >
+                                    ❌ Cancelar
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditSesion(sesion)}
+                                  className="bg-blue-50 hover:bg-blue-100 border-blue-300"
+                                >
+                                  ✏️ Editar
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1153,11 +1239,6 @@ export default function PacienteDetallePage() {
             )}
           </TabsContent>
         </Tabs>
-
-        {/* Añadir el componente al final del JSX, justo antes del cierre del div principal */}
-        <div className="no-print mt-8">
-          <DebugSesiones pacienteId={id} />
-        </div>
       </div>
     </Layout>
   )
