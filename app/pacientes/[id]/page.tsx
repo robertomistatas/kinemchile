@@ -289,8 +289,8 @@ export default function PacienteDetallePage() {
           head: [["Fecha", "Tipo", "Notas"]],
           body: [...sesiones, ...evaluaciones].map((sesion) => [
             typeof sesion.fecha === "string" ? sesion.fecha : new Date(sesion.fecha).toLocaleDateString(),
-            sesion.tipo,
-            sesion.notas,
+            sesion.tipo || "",
+            sesion.notas || "",
           ]),
         })
       }

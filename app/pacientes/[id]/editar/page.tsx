@@ -13,11 +13,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, ArrowLeft } from "lucide-react"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
-import { getPaciente, actualizarPaciente } from "@/lib/firestore"
+import { getPaciente, actualizarPaciente, getProfesionales } from "@/lib/firestore"
 import Link from "next/link"
 import { validarRut, formatearRut } from "@/lib/utils"
 
-import type { Paciente } from "@/lib/data"
+import type { Paciente, Usuario } from "@/lib/data"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DateComboInput } from "@/components/ui/date-combo-input"
 
@@ -45,11 +45,14 @@ export default function EditarPacientePage() {
     genero: "",
     prevision: "",
     fechaIngreso: "", // Nuevo campo
+    tratante_id: "none", // Campo para profesional tratante
+    tratante_nombre: "", // Campo para nombre del profesional tratante
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const [generalError, setGeneralError] = useState("")
   const [dataLoading, setDataLoading] = useState(true)
+  const [profesionales, setProfesionales] = useState<Usuario[]>([])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -61,6 +64,15 @@ export default function EditarPacientePage() {
     async function fetchPaciente() {
       try {
         setDataLoading(true)
+        
+        // Cargar profesionales
+        try {
+          const profesionalesData = await getProfesionales()
+          setProfesionales(profesionalesData || [])
+        } catch (error) {
+          console.error("Error al cargar profesionales:", error)
+        }
+        
         const pacienteData = await getPaciente(id)
         if (pacienteData) {
           setFormData({
@@ -83,6 +95,8 @@ export default function EditarPacientePage() {
             genero: pacienteData.genero || "",
             prevision: pacienteData.prevision || "",
             fechaIngreso: pacienteData.fechaIngreso || "",
+            tratante_id: pacienteData.tratante_id || "none",
+            tratante_nombre: pacienteData.tratante_nombre || "",
           })
         } else {
           setGeneralError("No se encontró el paciente")
@@ -117,7 +131,25 @@ export default function EditarPacientePage() {
   }
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData({ ...formData, [name]: value })
+    if (name === "tratante_id") {
+      // Cuando se selecciona un profesional tratante, actualizar también el nombre
+      if (value === "none") {
+        setFormData({ 
+          ...formData, 
+          tratante_id: "",
+          tratante_nombre: ""
+        })
+      } else {
+        const profesionalSeleccionado = profesionales.find(p => p.id === value)
+        setFormData({ 
+          ...formData, 
+          tratante_id: value,
+          tratante_nombre: profesionalSeleccionado ? profesionalSeleccionado.nombre : ""
+        })
+      }
+    } else {
+      setFormData({ ...formData, [name]: value })
+    }
 
     // Limpiar error del campo
     if (errors[name]) {
@@ -181,7 +213,9 @@ export default function EditarPacientePage() {
         genero: formData.genero,
         prevision: formData.prevision,
         fechaIngreso: formData.fechaIngreso || undefined,
-        updatedAt: Date.now(),
+        tratante_id: formData.tratante_id === "none" ? undefined : formData.tratante_id,
+        tratante_nombre: formData.tratante_id === "none" ? undefined : formData.tratante_nombre,
+        updatedAt: Date.now().toString(),
       })
 
       router.push(`/pacientes/${id}`)
@@ -351,6 +385,25 @@ export default function EditarPacientePage() {
                       onChange={(val) => setFormData({ ...formData, fechaIngreso: val })}
                       placeholder="DD-MM-AAAA"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tratante_id">Profesional Tratante</Label>
+                    <Select 
+                      value={formData.tratante_id} 
+                      onValueChange={(value) => handleSelectChange("tratante_id", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un profesional tratante" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {profesionales.map((profesional) => (
+                          <SelectItem key={profesional.id} value={profesional.id || ""}>
+                            {profesional.nombre} - {profesional.funcion || profesional.rol || 'Profesional'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="direccion">Dirección</Label>
