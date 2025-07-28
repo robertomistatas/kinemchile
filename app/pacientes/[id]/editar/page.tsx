@@ -133,7 +133,7 @@ export default function EditarPacientePage() {
   const handleSelectChange = (name: string, value: string) => {
     if (name === "tratante_id") {
       // Cuando se selecciona un profesional tratante, actualizar también el nombre
-      if (value === "none") {
+      if (value === "none" || !value) {
         setFormData({ 
           ...formData, 
           tratante_id: "",
@@ -193,7 +193,8 @@ export default function EditarPacientePage() {
     setGeneralError("")
 
     try {
-      await actualizarPaciente(id, {
+      // Preparar los datos limpiando valores undefined
+      const updateData: Partial<Paciente> = {
         nombre: formData.nombre,
         apellido: formData.apellido,
         rut: formData.rut,
@@ -212,11 +213,20 @@ export default function EditarPacientePage() {
         edad: formData.edad,
         genero: formData.genero,
         prevision: formData.prevision,
-        fechaIngreso: formData.fechaIngreso || undefined,
-        tratante_id: formData.tratante_id === "none" ? undefined : formData.tratante_id,
-        tratante_nombre: formData.tratante_id === "none" ? undefined : formData.tratante_nombre,
         updatedAt: Date.now().toString(),
-      })
+      }
+
+      // Solo agregar campos de fecha de ingreso y tratante si tienen valores válidos
+      if (formData.fechaIngreso && formData.fechaIngreso.trim() !== "") {
+        updateData.fechaIngreso = formData.fechaIngreso
+      }
+
+      if (formData.tratante_id && formData.tratante_id !== "none" && formData.tratante_id.trim() !== "") {
+        updateData.tratante_id = formData.tratante_id
+        updateData.tratante_nombre = formData.tratante_nombre || ""
+      }
+
+      await actualizarPaciente(id, updateData)
 
       router.push(`/pacientes/${id}`)
     } catch (error) {
