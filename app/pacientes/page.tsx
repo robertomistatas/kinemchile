@@ -75,8 +75,8 @@ export default function PacientesPage() {
         paciente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         paciente.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
         paciente.rut.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (paciente.email && paciente.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (paciente.telefono && paciente.telefono.toLowerCase().includes(searchTerm.toLowerCase()))
+        (paciente.telefono && paciente.telefono.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (paciente.fechaIngreso && paciente.fechaIngreso.toLowerCase().includes(searchTerm.toLowerCase()))
     )
 
   const handleEliminarPaciente = (id: string) => {
@@ -139,7 +139,7 @@ export default function PacientesPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
             <Input
               type="search"
-              placeholder="Buscar por nombre, RUT, email o teléfono..."
+              placeholder="Buscar por nombre, RUT, teléfono o fecha de ingreso..."
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -153,7 +153,7 @@ export default function PacientesPage() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>RUT</TableHead>
                 <TableHead className="hidden md:table-cell">Teléfono</TableHead>
-                <TableHead className="hidden md:table-cell">Email</TableHead>
+                <TableHead className="hidden md:table-cell">Fecha de Ingreso</TableHead>
                 <TableHead className="hidden md:table-cell">Estado</TableHead>
                 <TableHead className="hidden md:table-cell">Profesional Tratante</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -182,7 +182,9 @@ export default function PacientesPage() {
                     </TableCell>
                     <TableCell>{paciente.rut}</TableCell>
                     <TableCell className="hidden md:table-cell">{paciente.telefono}</TableCell>
-                    <TableCell className="hidden md:table-cell">{paciente.email}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {paciente.fechaIngreso || <span className="text-muted-foreground">No ingresada</span>}
+                    </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
