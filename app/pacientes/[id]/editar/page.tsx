@@ -213,12 +213,8 @@ export default function EditarPacientePage() {
         edad: formData.edad,
         genero: formData.genero,
         prevision: formData.prevision,
+        fechaIngreso: formData.fechaIngreso || "",
         updatedAt: Date.now().toString(),
-      }
-
-      // Solo agregar campos de fecha de ingreso y tratante si tienen valores válidos
-      if (formData.fechaIngreso && formData.fechaIngreso.trim() !== "") {
-        updateData.fechaIngreso = formData.fechaIngreso
       }
 
       if (formData.tratante_id && formData.tratante_id !== "none" && formData.tratante_id.trim() !== "") {

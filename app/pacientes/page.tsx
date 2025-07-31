@@ -5,11 +5,11 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Plus, FileText, Edit, Trash2 } from "lucide-react"
+import { Search, Plus, FileText, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
-import { getPacientes } from "@/lib/firestore"
+import { getPacientes, getPacientesPorKinesiologo } from "@/lib/firestore-service"
 import { eliminarPaciente } from "@/lib/firestore-service"
 import type { Paciente } from "@/lib/data"
 import {
@@ -32,6 +32,10 @@ export default function PacientesPage() {
   const [pacienteAEliminar, setPacienteAEliminar] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [verTodos, setVerTodos] = useState(false)
+  
+  // Estados para ordenamiento
+  const [ordenarPor, setOrdenarPor] = useState<'nombre' | 'fechaIngreso'>('nombre')
+  const [ordenAscendente, setOrdenAscendente] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,8 +50,8 @@ export default function PacientesPage() {
 
         let data
         // Si el usuario es profesional y no está en modo verTodos, cargar solo sus pacientes
-        if (!verTodos && (userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional")) {
-          data = (await getPacientes()).filter((p) => p.tratante_id === userInfo.id)
+        if (!verTodos && (userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional") && userInfo.id) {
+          data = await getPacientesPorKinesiologo(userInfo.id)
         } else {
           // Si es admin, recepcionista o está en modo verTodos, cargar todos los pacientes
           data = await getPacientes()
@@ -67,8 +71,34 @@ export default function PacientesPage() {
     }
   }, [user, userInfo, verTodos])
 
-  // Filtrar solo pacientes activos y según el término de búsqueda
-  const filteredPacientes = pacientes
+  // Función para manejar el cambio de ordenamiento
+  const handleOrdenar = (campo: 'nombre' | 'fechaIngreso') => {
+    if (ordenarPor === campo) {
+      // Si es el mismo campo, cambiar la dirección
+      setOrdenAscendente(!ordenAscendente)
+    } else {
+      // Si es campo diferente, cambiar campo y poner ascendente
+      setOrdenarPor(campo)
+      setOrdenAscendente(true)
+    }
+  }
+
+  // Función para convertir fecha DD-MM-AAAA a formato comparable
+  const convertirFechaParaComparacion = (fecha: string): Date => {
+    if (!fecha) return new Date(0) // Fecha muy antigua para fechas vacías
+    
+    const partes = fecha.split('-')
+    if (partes.length !== 3) return new Date(0)
+    
+    const dia = parseInt(partes[0])
+    const mes = parseInt(partes[1]) - 1 // Los meses en JavaScript van de 0-11
+    const año = parseInt(partes[2])
+    
+    return new Date(año, mes, dia)
+  }
+
+  // Filtrar y ordenar pacientes
+  const pacientesFiltradosYOrdenados = pacientes
     .filter((paciente) => paciente.activo) // Mostrar solo activos
     .filter(
       (paciente) =>
@@ -78,6 +108,21 @@ export default function PacientesPage() {
         (paciente.telefono && paciente.telefono.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (paciente.fechaIngreso && paciente.fechaIngreso.toLowerCase().includes(searchTerm.toLowerCase()))
     )
+    .sort((a, b) => {
+      let comparacion = 0
+      
+      if (ordenarPor === 'nombre') {
+        const nombreCompleto_a = `${a.nombre} ${a.apellido}`.toLowerCase()
+        const nombreCompleto_b = `${b.nombre} ${b.apellido}`.toLowerCase()
+        comparacion = nombreCompleto_a.localeCompare(nombreCompleto_b)
+      } else if (ordenarPor === 'fechaIngreso') {
+        const fecha_a = convertirFechaParaComparacion(a.fechaIngreso || '')
+        const fecha_b = convertirFechaParaComparacion(b.fechaIngreso || '')
+        comparacion = fecha_a.getTime() - fecha_b.getTime()
+      }
+      
+      return ordenAscendente ? comparacion : -comparacion
+    })
 
   const handleEliminarPaciente = (id: string) => {
     setPacienteAEliminar(id)
@@ -90,8 +135,8 @@ export default function PacientesPage() {
       await eliminarPaciente(pacienteAEliminar)
       // Recargar la lista desde la base de datos
       let data
-      if (userInfo?.rol === "kinesiologo") {
-        data = await getPacientes(userInfo.id)
+      if (userInfo?.rol === "kinesiologo" && userInfo.id) {
+        data = await getPacientesPorKinesiologo(userInfo.id)
       } else {
         data = await getPacientes()
       }
@@ -146,14 +191,64 @@ export default function PacientesPage() {
             />
           </div>
         </div>
+        
+        {/* Indicador de ordenamiento */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Ordenado por:</span>
+          <span className="font-medium">
+            {ordenarPor === 'nombre' ? 'Nombre' : 'Fecha de Ingreso'}
+          </span>
+          <span>
+            ({ordenAscendente ? 'A-Z' : 'Z-A'})
+          </span>
+          {ordenarPor === 'fechaIngreso' && (
+            <span className="text-xs">
+              (más {ordenAscendente ? 'antiguos' : 'recientes'} primero)
+            </span>
+          )}
+        </div>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nombre</TableHead>
+                <TableHead>
+                  <Button 
+                    variant="ghost" 
+                    className="h-auto p-0 font-semibold hover:bg-transparent"
+                    onClick={() => handleOrdenar('nombre')}
+                  >
+                    Nombre
+                    {ordenarPor === 'nombre' ? (
+                      ordenAscendente ? (
+                        <ArrowUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-1 h-4 w-4" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
+                    )}
+                  </Button>
+                </TableHead>
                 <TableHead>RUT</TableHead>
                 <TableHead className="hidden md:table-cell">Teléfono</TableHead>
-                <TableHead className="hidden md:table-cell">Fecha de Ingreso</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  <Button 
+                    variant="ghost" 
+                    className="h-auto p-0 font-semibold hover:bg-transparent"
+                    onClick={() => handleOrdenar('fechaIngreso')}
+                  >
+                    Fecha de Ingreso
+                    {ordenarPor === 'fechaIngreso' ? (
+                      ordenAscendente ? (
+                        <ArrowUp className="ml-1 h-4 w-4" />
+                      ) : (
+                        <ArrowDown className="ml-1 h-4 w-4" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
+                    )}
+                  </Button>
+                </TableHead>
                 <TableHead className="hidden md:table-cell">Estado</TableHead>
                 <TableHead className="hidden md:table-cell">Profesional Tratante</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -166,14 +261,14 @@ export default function PacientesPage() {
                     Cargando pacientes...
                   </TableCell>
                 </TableRow>
-              ) : filteredPacientes.length === 0 ? (
+              ) : pacientesFiltradosYOrdenados.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
                     No se encontraron pacientes.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPacientes.map((paciente) => (
+                pacientesFiltradosYOrdenados.map((paciente) => (
                   <TableRow key={paciente.id}>
                     <TableCell className="font-medium">
                       <Link href={`/pacientes/${paciente.id}`} className="hover:underline">
@@ -215,7 +310,7 @@ export default function PacientesPage() {
                           variant="ghost"
                           size="icon"
                           title="Eliminar paciente"
-                          onClick={() => handleEliminarPaciente(paciente.id)}
+                          onClick={() => paciente.id && handleEliminarPaciente(paciente.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                           <span className="sr-only">Eliminar</span>

@@ -155,7 +155,7 @@ export default function NuevoPacientePage() {
         tratante_id: formData.tratante_id,
         tratante_nombre: profesionalSeleccionado ? profesionalSeleccionado.nombre : "",
         tratante_funcion: profesionalSeleccionado ? profesionalSeleccionado.funcion : "",
-        fechaIngreso: formData.fechaIngreso || undefined,
+        fechaIngreso: formData.fechaIngreso || "",
       })
 
       router.push(`/pacientes/${pacienteId}`)

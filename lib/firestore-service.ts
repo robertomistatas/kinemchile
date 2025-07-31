@@ -36,10 +36,10 @@ export async function getPacientes(): Promise<Paciente[]> {
     const pacientesRef = collection(firestore, "pacientes")
     const snapshot = await getDocs(pacientesRef)
 
-    return snapshot.docs.map((doc) => {
+    const pacientes = snapshot.docs.map((doc) => {
       const data = doc.data()
       // Asegurarse de que todos los campos requeridos existan
-      return {
+      const paciente = {
         id: doc.id,
         nombre: data.nombre || "",
         apellido: data.apellido || "",
@@ -51,15 +51,22 @@ export async function getPacientes(): Promise<Paciente[]> {
         diagnostico: data.diagnostico || data.diagnosticoMedico || "",
         antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
         activo: typeof data.activo === "boolean" ? data.activo : true,
-        createdAt: data.createdAt || Date.now(),
+        createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
         fechaAlta: data.fechaAlta || null,
         notasAlta: data.notasAlta || null,
         prevision: data.prevision || "",
         kinesiologo_id: data.kinesiologo_id || null,
         kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || null,
+        tratante_nombre: data.tratante_nombre || null,
+        tratante_funcion: data.tratante_funcion || null,
         fechaIngreso: data.fechaIngreso || "",
       } as Paciente
+      
+      return paciente
     })
+    
+    return pacientes
   } catch (error) {
     console.error("Error al obtener pacientes:", error)
     return []
@@ -1067,17 +1074,32 @@ export async function getPacientesPorKinesiologo(kinesiologoId: string): Promise
   if (!firestore) return []
 
   try {
-    console.log(`Obteniendo pacientes del kinesiólogo ${kinesiologoId}...`)
+    console.log(`Obteniendo pacientes del profesional ${kinesiologoId}...`)
     const pacientesRef = collection(firestore, "pacientes")
-    const q = query(pacientesRef, where("kinesiologo_id", "==", kinesiologoId))
-    const snapshot = await getDocs(q)
+    
+    // Buscar tanto por kinesiologo_id (legacy) como por tratante_id (nuevo)
+    const [queryKinesiologo, queryTratante] = await Promise.all([
+      getDocs(query(pacientesRef, where("kinesiologo_id", "==", kinesiologoId))),
+      getDocs(query(pacientesRef, where("tratante_id", "==", kinesiologoId)))
+    ])
 
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Paciente[]
+    // Combinar resultados y eliminar duplicados
+    const pacientesMap = new Map()
+    
+    queryKinesiologo.docs.forEach(doc => {
+      pacientesMap.set(doc.id, { id: doc.id, ...doc.data() })
+    })
+    
+    queryTratante.docs.forEach(doc => {
+      pacientesMap.set(doc.id, { id: doc.id, ...doc.data() })
+    })
+
+    const pacientes = Array.from(pacientesMap.values()) as Paciente[]
+    console.log(`Se encontraron ${pacientes.length} pacientes para el profesional ${kinesiologoId}`)
+    
+    return pacientes
   } catch (error) {
-    console.error(`Error al obtener pacientes del kinesiólogo ${kinesiologoId}:`, error)
+    console.error(`Error al obtener pacientes del profesional ${kinesiologoId}:`, error)
     return []
   }
 }

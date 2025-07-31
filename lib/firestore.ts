@@ -1,25 +1,5 @@
 import { collection, getDocs, getFirestore, query, where } from "firebase/firestore"
-
-// Define the Paciente type
-export interface Paciente {
-  id: string
-  nombre: string
-  apellido: string
-  rut: string
-  email: string
-  telefono: string
-  fechaNacimiento: string
-  direccion: string
-  diagnostico: string
-  antecedentesPersonales: string
-  activo: boolean
-  createdAt: number
-  fechaAlta: string | null
-  notasAlta: string | null
-  prevision: string
-  kinesiologo_id: string | null
-  kinesiologo_nombre: string | null
-}
+import type { Paciente } from "./data"
 
 // Initialize Firebase (replace with your actual Firebase config)
 const firebaseConfig = {
@@ -84,7 +64,7 @@ export async function getPacientes(profesionalId?: string): Promise<Paciente[]> 
         diagnostico: data.diagnostico || data.diagnosticoMedico || "",
         antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
         activo: typeof data.activo === "boolean" ? data.activo : true,
-        createdAt: data.createdAt || Date.now(),
+        createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
         fechaAlta: data.fechaAlta || null,
         notasAlta: data.notasAlta || null,
         prevision: data.prevision || "",
@@ -93,6 +73,7 @@ export async function getPacientes(profesionalId?: string): Promise<Paciente[]> 
         tratante_id: data.tratante_id || null,
         tratante_nombre: data.tratante_nombre || null,
         tratante_funcion: data.tratante_funcion || null,
+        fechaIngreso: data.fechaIngreso || "",
       } as Paciente
     })
   } catch (error) {
