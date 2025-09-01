@@ -58,7 +58,11 @@ export default function DarDeAltaPage() {
     setSuccess(false)
 
     try {
-      await darDeAltaPaciente(selectedPacienteId, notas)
+      if (!user) {
+        setError("Usuario no autenticado")
+        return
+      }
+      await darDeAltaPaciente(selectedPacienteId, notas, user.uid, user.displayName || user.email || "")
       setSuccess(true)
 
       // Esperar 2 segundos antes de redirigir

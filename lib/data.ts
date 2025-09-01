@@ -20,6 +20,9 @@ export interface Paciente {
   tratante_funcion?: string // Función del profesional tratante (kinesiologa, medico)
   kinesiologo_id?: string | null
   kinesiologo_nombre?: string | null
+  // Campos para el profesional que da de alta
+  profesional_alta_id?: string | null
+  profesional_alta_nombre?: string | null
   fechaAlta?: string | null
   notasAlta?: string | null
   createdAt?: string

@@ -92,6 +92,8 @@ export {
   crearPaciente,
   darDeAltaPaciente,
   eliminarPaciente,
+  getPacientesInactivos,
+  getPacientesInactivosPorProfesional,
   getSesion,
   crearSesion,
   actualizarSesion,

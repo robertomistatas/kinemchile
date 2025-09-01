@@ -1,26 +1,28 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent 
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from "@/components/ui/button"
-import DatePicker from "react-datepicker"
-import "react-datepicker/dist/react-datepicker.css"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
-import { useRouter } from "next/navigation"
-import {
-  getPaciente,
-  crearPaciente,
-  getCitasPorFecha,
-  crearCita,
-  actualizarCita,
-  eliminarCita,
-  cambiarEstadoCita,
-  getProfesionales
-} from "@/lib/firestore"
-import type { Paciente, Cita, Usuario } from "@/lib/data"
 import {
   Dialog,
   DialogContent,
@@ -31,1114 +33,596 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Plus,
-  Edit,
-  Trash2,
-  Clock,
-  AlertCircle,
-  CheckCircle,
-  UserPlus,
-  CalendarIcon,
-  Check,
+import { 
+  Plus, 
+  Clock, 
+  GripVertical, 
+  Trash2, 
+  Edit, 
+  UserCheck,
+  Users,
   X,
-  MoreHorizontal,
+  RotateCcw,
+  Settings,
+  Download,
+  Upload,
+  Save
 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { formatearRut, validarRut } from "@/lib/utils"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { collection, getDocs, getDb } from "@/lib/firebase"
-import { PacienteSearchOptimized } from "@/components/paciente-search-optimized"
-import { DebugCitas } from "@/components/debug-citas"
+import { ConfiguracionCola } from "@/components/configuracion-cola"
 
-export default function AgendaPage() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-  const [date, setDate] = useState<Date | undefined>(new Date())
-  const [pacientes, setPacientes] = useState<Paciente[]>([])
-  const [citas, setCitas] = useState<Cita[]>([])
-  const [showNuevaCita, setShowNuevaCita] = useState(false)
-  const [citaEnEdicion, setCitaEnEdicion] = useState<Cita | null>(null)
-  const [formData, setFormData] = useState({
-    pacienteId: "",
-    fecha: new Date(),
-    hora: "09:00",
-    motivo: "",
-    prevision: "",
-    profesional_id: "",
-  })
-  const [profesionales, setProfesionales] = useState<Usuario[]>([])
-  const [dataLoading, setDataLoading] = useState(false)
-  const [citasLoading, setCitasLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [error, setError] = useState("")
-  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null)
-  const [activeTab, setActiveTab] = useState("paciente-existente")
-  const [nuevoPaciente, setNuevoPaciente] = useState({
-    nombre: "",
-    apellido: "",
-    rut: "",
-    telefono: "",
-    prevision: "",
-  })
-  const [nuevoPacienteErrors, setNuevoPacienteErrors] = useState<Record<string, string>>({})
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [refreshCitas, setRefreshCitas] = useState(0);
-  const [showDebug, setShowDebug] = useState(false); // Estado para mostrar/ocultar panel de depuración
+// Tipos para la cola de espera
+interface PacienteEspera {
+  id: string
+  nombre: string
+  turno: string
+  color: string
+  estado: 'esperando' | 'en-consulta' | 'atendido'
+  horaIngreso: Date
+}
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login")
-    }
-  }, [user, loading, router])
+// Colores predefinidos para los pacientes
+const COLORES_PACIENTES = [
+  '#3B82F6', // Azul
+  '#EF4444', // Rojo
+  '#10B981', // Verde
+  '#F59E0B', // Amarillo
+  '#8B5CF6', // Púrpura
+  '#EC4899', // Rosa
+  '#14B8A6', // Teal
+  '#F97316', // Naranja
+  '#6366F1', // Índigo
+  '#84CC16'  // Lima
+]
 
-  useEffect(() => {
-    async function fetchPacientes() {
-      try {
-        setDataLoading(true)
-        console.log("Cargando pacientes para el diálogo de citas...")
+// Componente para item arrastrable de la cola
+function PacienteItem({ paciente, onCambiarEstado, onEliminar }: {
+  paciente: PacienteEspera
+  onCambiarEstado: (id: string) => void
+  onEliminar: (id: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: paciente.id })
 
-        // Obtener todos los pacientes (sin filtrar)
-        const pacientesRef = collection(getDb(), "pacientes")
-        const snapshot = await getDocs(pacientesRef)
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
 
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Paciente[]
-
-        console.log(`Pacientes cargados en Agenda: ${data.length}`)
-
-        // Verificar que los datos tengan la estructura correcta
-        if (data.length > 0) {
-          console.log("Ejemplo de paciente:", {
-            id: data[0].id,
-            nombre: data[0].nombre,
-            apellido: data[0].apellido,
-            rut: data[0].rut,
-          })
-        } else {
-          console.log("No se encontraron pacientes")
+  const getEstadoInfo = () => {
+    switch (paciente.estado) {
+      case 'esperando':
+        return { 
+          texto: 'Esperando', 
+          clase: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          icono: <Clock className="h-4 w-4" />,
+          boton: { texto: 'Atender', clase: 'bg-blue-600 hover:bg-blue-700' }
         }
-
-        setPacientes(data)
-      } catch (error) {
-        console.error("Error al cargar pacientes:", error)
-        setError("Error al cargar la lista de pacientes")
-      } finally {
-        setDataLoading(false)
-      }
-    }
-
-    if (user) {
-      fetchPacientes()
-    }
-  }, [user])  // Estado para forzar la recarga de citas
-  // Cargar citas para la fecha seleccionada
-  useEffect(() => {
-    async function fetchCitas() {
-      if (!date) return
-
-      try {
-        setCitasLoading(true)
-        console.log("Solicitando citas para la fecha:", date.toLocaleDateString());
-        console.log("Timestamp inicio del día:", new Date(date).setHours(0, 0, 0, 0));
-        console.log("Timestamp fin del día:", new Date(date).setHours(23, 59, 59, 999));
-        
-        const citasData = await getCitasPorFecha(date)
-        console.log(`Citas cargadas para ${date.toLocaleDateString()}:`, citasData.length)
-        
-        // Diagnóstico detallado de cada cita para ver por qué no aparecen
-        citasData.forEach((cita, index) => {
-          console.log(`Cita ${index + 1}:`, {
-            id: cita.id,
-            pacienteId: cita.pacienteId,
-            fecha: cita.fecha,
-            fechaFormateada: typeof cita.fecha === 'number' ? new Date(cita.fecha).toLocaleString() : 'No es un número',
-            hora: cita.hora,
-            estado: cita.estado,
-            paciente: cita.paciente ? `${cita.paciente.nombre} ${cita.paciente.apellido}` : 'No hay datos de paciente',
-            mismosDia: date ? new Date(cita.fecha).toDateString() === date.toDateString() : false
-          });
-        });
-        
-        if (citasData.length > 0) {
-          console.log("Ejemplo de cita cargada:", {
-            id: citasData[0].id,
-            pacienteId: citasData[0].pacienteId,
-            fecha: new Date(Number(citasData[0].fecha)).toLocaleString(),
-            hora: citasData[0].hora,
-            estado: citasData[0].estado
-          });
-        } else {
-          console.log("No se encontraron citas para esta fecha");
+      case 'en-consulta':
+        return { 
+          texto: 'En consulta', 
+          clase: 'bg-blue-100 text-blue-800 border-blue-200',
+          icono: <UserCheck className="h-4 w-4" />,
+          boton: { texto: 'Finalizar', clase: 'bg-green-600 hover:bg-green-700' }
         }
-        
-        setCitas(citasData)
-      } catch (error) {
-        console.error("Error al cargar citas:", error)
-      } finally {
-        setCitasLoading(false)
-      }
-    }    if (user && date) {
-      console.log("Actualizando citas - refreshCounter:", refreshCitas);
-      fetchCitas();
+      case 'atendido':
+        return { 
+          texto: 'Atendido', 
+          clase: 'bg-green-100 text-green-800 border-green-200',
+          icono: <UserCheck className="h-4 w-4" />,
+          boton: { texto: 'Volver a cola', clase: 'bg-gray-600 hover:bg-gray-700' }
+        }
+      default:
+        return { 
+          texto: 'Esperando', 
+          clase: 'bg-gray-100 text-gray-800 border-gray-200',
+          icono: <Clock className="h-4 w-4" />,
+          boton: { texto: 'Atender', clase: 'bg-blue-600 hover:bg-blue-700' }
+        }
     }
-  }, [user, date, refreshCitas]) // Añadido refreshCitas para forzar recarga
+  }
 
-  // Cargar profesionales (kinesiologos y médicos)
+  const estadoInfo = getEstadoInfo()
+
+  return (
+    <Card 
+      ref={setNodeRef} 
+      style={style} 
+      className={`mb-3 cursor-move border-l-4 hover:shadow-md transition-all duration-200 ${
+        isDragging ? 'shadow-xl scale-105' : ''
+      } ${paciente.estado === 'atendido' ? 'opacity-60' : ''}`}
+    >
+      <div 
+        className="border-l-4" 
+        style={{ borderLeftColor: paciente.color }}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div 
+                {...attributes} 
+                {...listeners}
+                className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 transition-colors"
+              >
+                <GripVertical className="h-5 w-5 text-gray-400" />
+              </div>
+              
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                  <h3 className="font-semibold text-lg">{paciente.nombre}</h3>
+                  <span 
+                    className="w-3 h-3 rounded-full border border-gray-200"
+                    style={{ backgroundColor: paciente.color }}
+                  />
+                </div>
+                <p className="text-sm text-gray-600 mb-1">Turno: <span className="font-medium">{paciente.turno}</span></p>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    Ingreso: {paciente.horaIngreso.toLocaleTimeString('es-CL', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                  <span>
+                    Esperando: {Math.floor((Date.now() - paciente.horaIngreso.getTime()) / 60000)} min
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium border ${estadoInfo.clase} flex items-center space-x-1`}>
+                {estadoInfo.icono}
+                <span>{estadoInfo.texto}</span>
+              </div>
+              
+              <Button
+                size="sm"
+                onClick={() => onCambiarEstado(paciente.id)}
+                className={estadoInfo.boton.clase}
+              >
+                {estadoInfo.boton.texto}
+              </Button>
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onEliminar(paciente.id)}
+                className="text-red-600 hover:bg-red-50 border-red-200"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </div>
+    </Card>
+  )
+}
+
+export default function ColaEsperaPage() {
+  const { user } = useAuth()
+  const [pacientesEspera, setPacientesEspera] = useState<PacienteEspera[]>([])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editandoPaciente, setEditandoPaciente] = useState<PacienteEspera | null>(null)
+  const [nuevoFormData, setNuevoFormData] = useState({
+    nombre: '',
+    turno: ''
+  })
+  
+  // Configuración de la cola
+  const [configuracion, setConfiguracion] = useState({
+    sonidosHabilitados: true,
+    volumen: 0.5,
+    mostrarTiempos: true,
+    autoAvanzar: false
+  })
+
+  // Persistencia local
   useEffect(() => {
-    async function fetchProfesionales() {
-      if (!user) return;
-      
+    const savedPacientes = localStorage.getItem('cola-espera-pacientes')
+    const savedConfig = localStorage.getItem('cola-espera-config')
+    
+    if (savedPacientes) {
       try {
-        console.log("Cargando profesionales...");
-        const profesionalesData = await getProfesionales();
-        console.log(`Se encontraron ${profesionalesData.length} profesionales`);
-        setProfesionales(profesionalesData);
+        const pacientes = JSON.parse(savedPacientes).map((p: any) => ({
+          ...p,
+          horaIngreso: new Date(p.horaIngreso)
+        }))
+        setPacientesEspera(pacientes)
       } catch (error) {
-        console.error("Error al cargar profesionales:", error);
+        console.error('Error al cargar pacientes guardados:', error)
       }
     }
     
-    fetchProfesionales();
-  }, [user]);
+    if (savedConfig) {
+      try {
+        setConfiguracion(JSON.parse(savedConfig))
+      } catch (error) {
+        console.error('Error al cargar configuración guardada:', error)
+      }
+    }
+  }, [])
+
+  // Guardar automáticamente
+  useEffect(() => {
+    localStorage.setItem('cola-espera-pacientes', JSON.stringify(pacientesEspera))
+  }, [pacientesEspera])
 
   useEffect(() => {
-    async function fetchPacienteSeleccionado() {
-      if (!formData.pacienteId) {
-        setSelectedPaciente(null)
-        setFormData((prev) => ({ ...prev, prevision: "" }))
-        return
-      }
+    localStorage.setItem('cola-espera-config', JSON.stringify(configuracion))
+  }, [configuracion])
 
-      try {
-        const paciente = await getPaciente(formData.pacienteId)
-        setSelectedPaciente(paciente)
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
-        // Si el paciente tiene previsión, actualizar el formulario
-        if (paciente && paciente.prevision) {
-          setFormData((prev) => ({ ...prev, prevision: paciente.prevision }))
-        }
-      } catch (error) {
-        console.error("Error al cargar paciente seleccionado:", error)
-      }
-    }
-
-    if (formData.pacienteId) {
-      fetchPacienteSeleccionado()
-    }
-  }, [formData.pacienteId])
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData({ ...formData, [name]: value })
+  // Generar color aleatorio para nuevo paciente
+  const getRandomColor = () => {
+    return COLORES_PACIENTES[Math.floor(Math.random() * COLORES_PACIENTES.length)]
   }
 
-  const handleNuevoPacienteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+  // Manejar fin de arrastre
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
 
-    if (name === "rut") {
-      setNuevoPaciente({ ...nuevoPaciente, [name]: formatearRut(value) })
-    } else {
-      setNuevoPaciente({ ...nuevoPaciente, [name]: value })
-    }
+    if (active.id !== over?.id) {
+      setPacientesEspera((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id)
+        const newIndex = items.findIndex((item) => item.id === over?.id)
 
-    // Limpiar error del campo
-    if (nuevoPacienteErrors[name]) {
-      setNuevoPacienteErrors({ ...nuevoPacienteErrors, [name]: "" })
+        return arrayMove(items, oldIndex, newIndex)
+      })
     }
   }
 
-  const handleSelectChange = (name: string, value: string) => {
-    if (activeTab === "paciente-existente") {
-      setFormData({ ...formData, [name]: value })
-    } else {
-      setNuevoPaciente({ ...nuevoPaciente, [name]: value })
-    }
-  }
-
-  const handleDateChange = (newDate: Date | undefined) => {
-    if (newDate) {
-      setFormData({ ...formData, fecha: newDate })
-    }
-  }
-
-  const validateNuevoPaciente = () => {
-    const errors: Record<string, string> = {}
-
-    if (!nuevoPaciente.nombre.trim()) {
-      errors.nombre = "El nombre es obligatorio"
-    }
-
-    if (!nuevoPaciente.apellido.trim()) {
-      errors.apellido = "El apellido es obligatorio"
-    }
-
-    if (!nuevoPaciente.rut.trim()) {
-      errors.rut = "El RUT es obligatorio"
-    } else if (!validarRut(nuevoPaciente.rut)) {
-      errors.rut = "El RUT ingresado no es válido"
-    }
-
-    setNuevoPacienteErrors(errors)
-    return Object.keys(errors).length === 0
-  }
-
-  const handleCrearPacienteRapido = async () => {
-    if (!validateNuevoPaciente()) {
+  // Agregar nuevo paciente
+  const agregarPaciente = () => {
+    if (!nuevoFormData.nombre.trim() || !nuevoFormData.turno.trim()) {
       return
     }
 
-    setSubmitting(true)
-    setError("")
-
-    try {
-      // Crear paciente básico
-      const pacienteId = await crearPaciente({
-        nombre: nuevoPaciente.nombre,
-        apellido: nuevoPaciente.apellido,
-        rut: nuevoPaciente.rut,
-        telefono: nuevoPaciente.telefono,
-        prevision: nuevoPaciente.prevision,
-        email: "",
-        fechaNacimiento: "",
-      })
-
-      // Obtener el paciente recién creado
-      const pacienteCreado = await getPaciente(pacienteId)
-
-      // Actualizar la lista de pacientes
-      setPacientes([...pacientes, pacienteCreado])
-
-      // Seleccionar el paciente recién creado
-      setFormData({
-        ...formData,
-        pacienteId: pacienteId,
-        prevision: nuevoPaciente.prevision,
-      })
-
-      setSelectedPaciente(pacienteCreado)
-
-      // Cambiar a la pestaña de paciente existente
-      setActiveTab("paciente-existente")
-
-      // Limpiar el formulario de nuevo paciente
-      setNuevoPaciente({
-        nombre: "",
-        apellido: "",
-        rut: "",
-        telefono: "",
-        prevision: "",
-      })
-    } catch (error) {
-      console.error("Error al crear paciente rápido:", error)
-      setError("Error al crear el paciente. Por favor, intenta nuevamente.")
-    } finally {
-      setSubmitting(false)
+    const nuevoPaciente: PacienteEspera = {
+      id: Date.now().toString(),
+      nombre: nuevoFormData.nombre.trim(),
+      turno: nuevoFormData.turno.trim(),
+      color: getRandomColor(),
+      estado: 'esperando',
+      horaIngreso: new Date()
     }
-  }
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-    setError("")
-    setSuccess(false)
-    
-    try {
-      if (activeTab === "paciente-nuevo") {
-        handleCrearPacienteRapido()
-        return
-      }
 
-      if (!formData.pacienteId || !selectedPaciente) {
-        setError("Debes seleccionar un paciente")
-        setSubmitting(false)
-        return
-      }      // Crear objeto de fecha combinando la fecha y hora
-      const fechaHora = new Date(formData.fecha)
-      const [horas, minutos] = formData.hora.split(":").map(Number)
-      fechaHora.setHours(horas, minutos, 0, 0)
-      
-      // Obtener timestamp para la fecha (número)
-      const timestamp = fechaHora.getTime()
-      console.log(`Creando cita para: ${fechaHora.toLocaleString()} (timestamp: ${timestamp})`)
-      console.log(`Fecha actual seleccionada: ${date?.toLocaleString()} (timestamp: ${date?.getTime()})`)
-        // Datos de la cita
-      const citaData = {
-        fecha: timestamp,
-        hora: formData.hora,
-        pacienteId: formData.pacienteId,
-        paciente: {
-          id: selectedPaciente.id,
-          nombre: selectedPaciente.nombre,
-          apellido: selectedPaciente.apellido,
-          rut: selectedPaciente.rut,
-        },        
-        motivo: formData.motivo || "",
-        prevision: formData.prevision || "",
-        duracion: 60, // Añadir duración por defecto (1 hora)
-        estado: "programada", // Asegurarnos que el estado se incluya
-      }
-      
-      // Añadir información del profesional si se seleccionó uno
-      if (formData.profesional_id) {
-        const profesionalSeleccionado = profesionales.find(p => p.id === formData.profesional_id);
-        if (profesionalSeleccionado) {
-          Object.assign(citaData, {
-            profesional_id: profesionalSeleccionado.id,
-            profesional_nombre: profesionalSeleccionado.nombre,
-            profesional_funcion: profesionalSeleccionado.funcion
-          });
-          console.log(`Profesional asignado: ${profesionalSeleccionado.nombre} (${profesionalSeleccionado.funcion})`);
+    setPacientesEspera(prev => [...prev, nuevoPaciente])
+    setNuevoFormData({ nombre: '', turno: '' })
+    setIsDialogOpen(false)
+  }
+
+  // Cambiar estado del paciente
+  const cambiarEstadoPaciente = (id: string) => {
+    setPacientesEspera(prev => prev.map(paciente => {
+      if (paciente.id === id) {
+        switch (paciente.estado) {
+          case 'esperando':
+            return { ...paciente, estado: 'en-consulta' as const }
+          case 'en-consulta':
+            return { ...paciente, estado: 'atendido' as const }
+          case 'atendido':
+            return { ...paciente, estado: 'esperando' as const }
+          default:
+            return paciente
         }
       }
-      
-      if (citaEnEdicion && citaEnEdicion.id) {
-        // Actualizar cita existente
-        await actualizarCita(citaEnEdicion.id, citaData)
+      return paciente
+    }))
+  }
 
-        // Actualizar la lista de citas
-        setCitas(
-          citas.map((c) =>
-            c.id === citaEnEdicion.id
-              ? {
-                  ...citaData,
-                  id: citaEnEdicion.id,
-                  estado: citaEnEdicion.estado || "programada",
-                  createdAt: citaEnEdicion.createdAt || Date.now(),
-                } as Cita
-              : c,
-          ),
-        )      } else {        // Crear nueva cita - siempre mantener fecha como timestamp (número)
-        console.log("Enviando fecha a la BD como:", typeof citaData.fecha, citaData.fecha);
-        const citaId = await crearCita({
-          ...citaData,
-          // Asegurarnos que la fecha se guarde como timestamp para consistencia en la BD
-          fecha: citaData.fecha
-        })
+  // Eliminar paciente
+  const eliminarPaciente = (id: string) => {
+    setPacientesEspera(prev => prev.filter(p => p.id !== id))
+  }
 
-        // Siempre añadir la cita a la lista si estamos en la fecha correcta
-        const dateString = date?.toDateString() || '';
-        const fechaHoraString = fechaHora.toDateString();
-        
-        console.log(`Comparando fechas: Cita (${fechaHoraString}) vs Seleccionada (${dateString})`);
-        
-        // Verificamos si las fechas coinciden para añadir a la UI
-        if (fechaHoraString === dateString) {
-          console.log("Añadiendo nueva cita a la lista con ID:", citaId)
+  // Limpiar cola (eliminar atendidos)
+  const limpiarAtendidos = () => {
+    setPacientesEspera(prev => prev.filter(p => p.estado !== 'atendido'))
+  }
+
+  // Resetear cola
+  const resetearCola = () => {
+    setPacientesEspera([])
+  }
+
+  // Exportar/Importar cola
+  const exportarCola = () => {
+    const data = {
+      pacientes: pacientesEspera,
+      fecha: new Date().toISOString(),
+      configuracion
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `cola-espera-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const importarCola = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string)
+        if (data.pacientes && Array.isArray(data.pacientes)) {
+          const pacientes = data.pacientes.map((p: any) => ({
+            ...p,
+            horaIngreso: new Date(p.horaIngreso)
+          }))
+          setPacientesEspera(pacientes)
           
-          // Crear objeto de cita completo para mostrar en la UI
-          const nuevaCita: Cita = {
-            id: citaId,
-            ...citaData,
-            fecha: citaData.fecha, // Mantener como número para la UI
-            estado: "programada",
-            createdAt: Date.now(),
+          if (data.configuracion) {
+            setConfiguracion(data.configuracion)
           }
-          
-          console.log("Nueva cita creada:", nuevaCita);
-          
-          // Añadir a la lista de citas y reordenar
-          setCitas((citasActuales) => [...citasActuales, nuevaCita]);
-        } else {
-          console.log("La fecha de la cita no coincide con la fecha seleccionada. No se muestra en la lista actual.")
-          console.log(`Fecha cita: ${new Date(citaData.fecha).toDateString()}`)
-          console.log(`Fecha seleccionada: ${date?.toDateString()}`)
         }
-      }      setSuccess(true)
-
-      // Forzar una recarga de las citas para asegurarnos de que se muestra la lista actualizada
-      setRefreshCitas(prev => prev + 1)
-
-      // Esperar 1.5 segundos antes de cerrar el diálogo
-      setTimeout(() => {
-        resetForm()
-      }, 1500)
-    } catch (error) {
-      console.error("Error al guardar cita:", error)
-      setError("Error al procesar la solicitud. Por favor, intenta nuevamente.")
-    } finally {
-      setSubmitting(false)
+      } catch (error) {
+        console.error('Error al importar cola:', error)
+        alert('Error al importar el archivo. Verifica que sea un archivo válido.')
+      }
     }
+    reader.readAsText(file)
+    event.target.value = '' // Reset input
   }
 
-  const handleEditarCita = (cita: Cita) => {
-    setCitaEnEdicion(cita)
-
-    // Extraer la fecha y hora de la cita
-    const fechaCita = new Date(cita.fecha)
-
-    setFormData({
-      pacienteId: cita.pacienteId,
-      fecha: fechaCita,
-      hora: cita.hora,
-      motivo: cita.motivo,
-      prevision: cita.prevision || "",
-    })
-
-    setActiveTab("paciente-existente")
-    setShowNuevaCita(true)
-  }
-  
-  const handleEliminarCita = async (id: string | null) => {
-    if (!id) {
-      console.error("No se proporcionó un ID de cita válido");
-      setConfirmDelete(null);
-      return;
-    }
-    
-    try {
-      await eliminarCita(id)
-      
-      // Actualizar la lista local inmediatamente
-      setCitas(citas.filter((c) => c.id !== id))
-      setConfirmDelete(null)
-      
-      // Forzar una recarga de citas para sincronizar con la BD
-      setTimeout(() => {
-        setRefreshCitas(prev => prev + 1);
-      }, 500);
-    } catch (error) {
-      console.error("Error al eliminar cita:", error)
-      setError("Error al eliminar la cita. Por favor, intenta nuevamente.")
-    }
-  }
-  
-  const handleCambiarEstadoCita = async (id: string | undefined, nuevoEstado: "programada" | "completada" | "cancelada") => {
-    if (!id) {
-      console.error("No se proporcionó un ID de cita válido");
-      return;
-    }
-    try {
-      console.log(`Cambiando estado de cita ${id} a ${nuevoEstado}`);
-      await cambiarEstadoCita(id, nuevoEstado)
-
-      // Actualizar el estado en la lista local inmediatamente para UI responsiva
-      setCitas(citas.map((cita) => (cita.id === id ? { ...cita, estado: nuevoEstado, updatedAt: Date.now() } : cita)))
-      
-      // Forzar una recarga de citas después de un breve retraso para asegurar sincronización con la BD
-      setTimeout(() => {
-        setRefreshCitas(prev => prev + 1);
-      }, 500);
-    } catch (error) {
-      console.error(`Error al cambiar estado de la cita ${id}:`, error)
-      setError("Error al actualizar el estado de la cita. Por favor, intenta nuevamente.")
-    }
-  }
-
-  const resetForm = () => {
-    console.log("Reseteando formulario de cita");
-    setFormData({
-      pacienteId: "",
-      fecha: new Date(),
-      hora: "09:00",
-      motivo: "",
-      prevision: "",
-      profesional_id: "",
-    })
-    setNuevoPaciente({
-      nombre: "",
-      apellido: "",
-      rut: "",
-      telefono: "",
-      prevision: "",
-    })
-    setSelectedPaciente(null)
-    setCitaEnEdicion(null)
-    setShowNuevaCita(false)
-    setSuccess(false)
-    setError("")
-    setActiveTab("paciente-existente")
-    setNuevoPacienteErrors({})
-  }
-  // Ordenar citas por hora
-  const citasOrdenadas = [...citas].sort((a, b) => {
-    // Primero por hora
-    const comparacionHora = a.hora.localeCompare(b.hora)
-    if (comparacionHora !== 0) return comparacionHora
-
-    // Si la hora es igual, ordenar por estado (programada, completada, cancelada)
-    const prioridadEstado: Record<string, number> = { programada: 0, completada: 1, cancelada: 2 }
-    // Asignamos una prioridad por defecto (3) para estados desconocidos
-    return (prioridadEstado[a.estado] ?? 3) - (prioridadEstado[b.estado] ?? 3)
-  })
-
-  // Función para obtener el color según el estado
-  const getEstadoColor = (estado: string) => {
-    switch (estado) {
-      case "programada":
-        return "bg-blue-100 text-blue-800"
-      case "completada":
-        return "bg-green-100 text-green-800"
-      case "cancelada":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  if (loading || !user) {
-    return null
+  // Estadísticas de la cola
+  const stats = {
+    total: pacientesEspera.length,
+    esperando: pacientesEspera.filter(p => p.estado === 'esperando').length,
+    enConsulta: pacientesEspera.filter(p => p.estado === 'en-consulta').length,
+    atendidos: pacientesEspera.filter(p => p.estado === 'atendido').length,
   }
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Agenda</h1>
-            <p className="text-sm text-muted-foreground">Gestión de citas y horarios</p>
+            <h1 className="text-3xl font-bold">Cola de Espera</h1>
+            <p className="text-gray-600">Gestión de pacientes en espera - {new Date().toLocaleDateString('es-CL')}</p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowNuevaCita(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Cita
-            </Button>
-            {/* Botón de depuración */}
-            <Button variant="outline" onClick={() => setShowDebug(!showDebug)}>
-              {showDebug ? "Ocultar Debug" : "Mostrar Debug"}
+          <Button 
+            onClick={() => setIsDialogOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Paciente
+          </Button>
+        </div>
+
+        {/* Estadísticas */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-gray-500" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-gray-600">Total</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-yellow-500" />
+                <div>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.esperando}</p>
+                  <p className="text-sm text-gray-600">Esperando</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">{stats.enConsulta}</p>
+                  <p className="text-sm text-gray-600">En Consulta</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-5 w-5 text-green-500" />
+                <div>
+                  <p className="text-2xl font-bold text-green-600">{stats.atendidos}</p>
+                  <p className="text-sm text-gray-600">Atendidos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Acciones rápidas */}
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            onClick={limpiarAtendidos}
+            disabled={stats.atendidos === 0}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Limpiar Atendidos ({stats.atendidos})
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={resetearCola}
+            disabled={stats.total === 0}
+            className="text-red-600 border-red-200 hover:bg-red-50"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Resetear Cola
+          </Button>
+
+          <ConfiguracionCola 
+            configuracion={configuracion}
+            onActualizar={setConfiguracion}
+          />
+
+          <Button 
+            variant="outline" 
+            onClick={exportarCola}
+            disabled={stats.total === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
+          </Button>
+
+          <div className="relative">
+            <input
+              type="file"
+              accept=".json"
+              onChange={importarCola}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              id="importar-cola"
+            />
+            <Button variant="outline" asChild>
+              <label htmlFor="importar-cola" className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar
+              </label>
             </Button>
           </div>
         </div>
 
-        {/* Panel de depuración */}
-        {showDebug && (
-          <Card className="mb-6 border-dashed border-yellow-500">
-            <CardHeader className="bg-yellow-50">
-              <CardTitle>Panel de Depuración</CardTitle>
-              <CardDescription>Información para depuración de citas</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h3 className="text-sm font-medium">Fecha Seleccionada:</h3>
-                <p>{date ? date.toLocaleString() : "Ninguna"}</p>
-              </div>              <div>                <h3 className="text-sm font-medium">Citas Cargadas ({citas.length}):</h3>
-                {citas.length > 0 ? (
-                  <div className="mt-2 space-y-2 max-h-60 overflow-auto">
-                    <div className="text-xs mb-2 p-2 bg-gray-50 rounded">
-                      <strong>Citas ordenadas:</strong> {citasOrdenadas.length}
-                      <br />
-                      <strong>Fecha seleccionada:</strong> {date?.toLocaleDateString()}
-                      <br />
-                      <strong>Timestamp seleccionado:</strong> {date?.getTime()}
-                    </div>
-                    {citas.map((cita) => (
-                      <div key={cita.id} className="border p-2 rounded text-xs">
-                        <div><strong>ID:</strong> {cita.id}</div>
-                        <div><strong>Fecha (tipo):</strong> {typeof cita.fecha}</div>
-                        <div><strong>Fecha (valor):</strong> {typeof cita.fecha === 'number' ? new Date(cita.fecha).toLocaleString() : String(cita.fecha)}</div>
-                        <div><strong>Timestamp actual:</strong> {date ? date.getTime() : 'No hay fecha'}</div>
-                        <div><strong>¿Mismo día?:</strong> {date && typeof cita.fecha === 'number' ? new Date(cita.fecha).toDateString() === date.toDateString() ? 'Sí' : 'No' : 'No comparable'}</div>
-                        <div><strong>Hora:</strong> {cita.hora}</div>
-                        <div><strong>Estado:</strong> {cita.estado}</div>
-                        <div><strong>Paciente:</strong> {cita.paciente?.nombre || 'N/A'} {cita.paciente?.apellido || ''}</div>
-                      </div>
+        {/* Cola de pacientes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Users className="h-5 w-5" />
+              <span>Pacientes en Cola</span>
+            </CardTitle>
+            <CardDescription>
+              Arrastra los pacientes para reordenar la cola. Los colores ayudan a distinguir entre pacientes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {pacientesEspera.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-500 mb-2">No hay pacientes en cola</h3>
+                <p className="text-gray-400 mb-4">Agrega el primer paciente para comenzar</p>
+                <Button onClick={() => setIsDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Paciente
+                </Button>
+              </div>
+            ) : (
+              <DndContext 
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext 
+                  items={pacientesEspera.map(p => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {pacientesEspera.map((paciente) => (
+                      <PacienteItem
+                        key={paciente.id}
+                        paciente={paciente}
+                        onCambiarEstado={cambiarEstadoPaciente}
+                        onEliminar={eliminarPaciente}
+                      />
                     ))}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No hay citas cargadas</p>
-                )}
-              </div>              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" onClick={() => router.push('/agenda/debug-citas')}>
-                  Ir a herramienta de depuración
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setRefreshCitas(prev => prev + 1)}>
-                  Recargar citas
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="secondary" 
-                  onClick={() => {
-                    if (date) {
-                      // Forzar nueva carga con la misma fecha
-                      const nuevaFecha = new Date(date.getTime());
-                      setDate(nuevaFecha);
-                      console.log("Forzando recarga con fecha:", nuevaFecha.toLocaleString());
-                    }
-                  }}
-                >
-                  Forzar recarga de fecha
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Calendario</CardTitle>
-              <CardDescription>Selecciona una fecha para ver las citas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-2">
-                <DatePicker
-                  selected={date}
-                  onChange={setDate}
-                  dateFormat="dd-MM-yyyy"
-                  className="rounded-md border w-full px-3 py-2"
-                  popperPlacement="bottom-end"
-                  showPopperArrow={false}
-                  calendarClassName="z-50"
-                />
-                <span className="text-xs text-muted-foreground">Selecciona una fecha en el calendario</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Citas del día</CardTitle>
-                <CardDescription>{date ? date.toLocaleDateString() : "Selecciona una fecha"}</CardDescription>
-              </div>
-              {citasLoading && (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-              )}
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {citasOrdenadas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center">
-                    <CalendarIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">No hay citas programadas para este día.</p>
-                    <Button variant="outline" className="mt-4" onClick={() => setShowNuevaCita(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Agendar cita
-                    </Button>
-                  </div>
-                ) : (
-                  citasOrdenadas.map((cita) => (
-                    <div
-                      key={cita.id}
-                      className={`flex items-center justify-between rounded-md border p-4 ${
-                        cita.estado === "cancelada" ? "opacity-60" : ""
-                      }`}
-                    >
-                      <div className="flex items-start gap-4">
-                        <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                            cita.estado === "programada"
-                              ? "bg-blue-100 text-blue-800"
-                              : cita.estado === "completada"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {cita.estado === "programada" ? (
-                            <Clock className="h-5 w-5" />
-                          ) : cita.estado === "completada" ? (
-                            <Check className="h-5 w-5" />
-                          ) : (
-                            <X className="h-5 w-5" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {cita.paciente?.nombre || cita.pacienteNombre || "Sin nombre"} {cita.paciente?.apellido || ""}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {cita.hora} - {cita.motivo}
-                          </p>
-                          <div className="flex flex-wrap gap-2 mt-1">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getEstadoColor(cita.estado)}`}
-                            >
-                              {cita.estado === "programada"
-                                ? "Programada"
-                                : cita.estado === "completada"
-                                  ? "Completada"
-                                  : "Cancelada"}
-                            </span>                            {cita.prevision && (
-                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
-                                {cita.prevision}
-                              </span>
-                            )}
-                            {cita.profesional_nombre && (
-                              <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                                {cita.profesional_nombre} ({cita.profesional_funcion === "kinesiologa" ? "Kine" : "Med"})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Opciones</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleEditarCita(cita)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            {cita.estado !== "completada" && (
-                              <DropdownMenuItem onClick={() => handleCambiarEstadoCita(cita.id, "completada")}>
-                                <Check className="mr-2 h-4 w-4" />
-                                Marcar como completada
-                              </DropdownMenuItem>
-                            )}
-                            {cita.estado !== "cancelada" && (
-                              <DropdownMenuItem onClick={() => handleCambiarEstadoCita(cita.id, "cancelada")}>
-                                <X className="mr-2 h-4 w-4" />
-                                Cancelar cita
-                              </DropdownMenuItem>
-                            )}
-                            {cita.estado !== "programada" && (
-                              <DropdownMenuItem onClick={() => handleCambiarEstadoCita(cita.id, "programada")}>
-                                <Clock className="mr-2 h-4 w-4" />
-                                Marcar como programada
-                              </DropdownMenuItem>
-                            )}                            <DropdownMenuItem 
-                              className="text-red-600" 
-                              onClick={() => cita.id && setConfirmDelete(cita.id)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Eliminar
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Diálogo para nueva cita */}
-        <Dialog open={showNuevaCita} onOpenChange={setShowNuevaCita}>
-          <DialogContent className="sm:max-w-[600px] rounded-lg">
-            <DialogHeader>
-              <DialogTitle>{citaEnEdicion ? "Editar Cita" : "Nueva Cita"}</DialogTitle>
-              <DialogDescription>
-                {citaEnEdicion
-                  ? "Modifica los detalles de la cita existente."
-                  : "Completa el formulario para agendar una nueva cita."}
-              </DialogDescription>
-            </DialogHeader>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
+                </SortableContext>
+              </DndContext>
             )}
+          </CardContent>
+        </Card>
 
-            {success && (
-              <Alert className="border-green-500 text-green-500">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {citaEnEdicion ? "Cita actualizada correctamente." : "Cita agendada correctamente."}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="paciente-existente">Paciente existente</TabsTrigger>
-                <TabsTrigger value="paciente-nuevo">Paciente nuevo</TabsTrigger>
-              </TabsList>
-
-              <form onSubmit={handleSubmit}>
-                <div className="py-4">
-                  <TabsContent value="paciente-existente" className="mt-0">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="paciente">Paciente</Label>
-                        <div className="relative">
-                          <PacienteSearchOptimized
-                            pacientes={pacientes}
-                            selectedPacienteId={formData.pacienteId}
-                            onSelect={(value) => {
-                              console.log("Paciente seleccionado en diálogo:", value)
-                              handleSelectChange("pacienteId", value)
-                            }}
-                            onCreateNew={() => setActiveTab("paciente-nuevo")}
-                            disabled={dataLoading || submitting || success}
-                            placeholder={dataLoading ? "Cargando pacientes..." : "Buscar paciente..."}
-                            loading={dataLoading}
-                          />
-                        </div>
-
-                        {pacientes.length === 0 && !dataLoading && (
-                          <p className="text-sm text-amber-600">
-                            No hay pacientes disponibles. Crea un nuevo paciente en la pestaña "Paciente nuevo".
-                          </p>
-                        )}
-
-                        {/* Botón de depuración - solo visible en desarrollo */}
-                        {process.env.NODE_ENV !== "production" && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 text-xs"
-                            onClick={() => {
-                              console.log("Pacientes disponibles:", pacientes.length)
-                              console.log("Pacientes:", pacientes.slice(0, 5))
-                              console.log("ID seleccionado:", formData.pacienteId)
-                              console.log("Paciente seleccionado:", selectedPaciente)
-                            }}
-                          >
-                            Debug: Ver pacientes en consola
-                          </Button>
-                        )}
-                      </div>
-
-                      {selectedPaciente && (
-                        <div className="p-3 bg-muted rounded-md text-sm">
-                          <p>
-                            <strong>Paciente:</strong> {selectedPaciente.nombre} {selectedPaciente.apellido}
-                          </p>
-                          <p>
-                            <strong>RUT:</strong> {selectedPaciente.rut}
-                          </p>
-                          {selectedPaciente.telefono && (
-                            <p>
-                              <strong>Teléfono:</strong> {selectedPaciente.telefono}
-                            </p>
-                          )}
-                          {selectedPaciente.prevision && (
-                            <p>
-                              <strong>Previsión:</strong> {selectedPaciente.prevision}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="paciente-nuevo" className="mt-0">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="nombre">Nombre</Label>
-                          <Input
-                            id="nombre"
-                            name="nombre"
-                            value={nuevoPaciente.nombre}
-                            onChange={handleNuevoPacienteChange}
-                            placeholder="Nombre del paciente"
-                            disabled={submitting || success}
-                          />
-                          {nuevoPacienteErrors.nombre && (
-                            <p className="text-sm text-red-500">{nuevoPacienteErrors.nombre}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="apellido">Apellido</Label>
-                          <Input
-                            id="apellido"
-                            name="apellido"
-                            value={nuevoPaciente.apellido}
-                            onChange={handleNuevoPacienteChange}
-                            placeholder="Apellido del paciente"
-                            disabled={submitting || success}
-                          />
-                          {nuevoPacienteErrors.apellido && (
-                            <p className="text-sm text-red-500">{nuevoPacienteErrors.apellido}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="rut">RUT</Label>
-                          <Input
-                            id="rut"
-                            name="rut"
-                            value={nuevoPaciente.rut}
-                            onChange={handleNuevoPacienteChange}
-                            placeholder="12.345.678-9"
-                            disabled={submitting || success}
-                          />
-                          {nuevoPacienteErrors.rut && <p className="text-sm text-red-500">{nuevoPacienteErrors.rut}</p>}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="telefono">Teléfono</Label>
-                          <Input
-                            id="telefono"
-                            name="telefono"
-                            value={nuevoPaciente.telefono}
-                            onChange={handleNuevoPacienteChange}
-                            placeholder="+56 9 1234 5678"
-                            disabled={submitting || success}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="prevision-nuevo">Previsión</Label>
-                        <Select
-                          value={nuevoPaciente.prevision}
-                          onValueChange={(value) => handleSelectChange("prevision", value)}
-                          disabled={submitting || success}
-                        >
-                          <SelectTrigger id="prevision-nuevo">
-                            <SelectValue placeholder="Selecciona previsión" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Particular">Particular</SelectItem>
-                            <SelectItem value="Fonasa">Fonasa</SelectItem>
-                            <SelectItem value="Isapre">Isapre</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="pt-2">
-                        <Button
-                          type="button"
-                          onClick={handleCrearPacienteRapido}
-                          className="w-full"
-                          disabled={submitting || success}
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Crear paciente y continuar
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <div className="space-y-4 mt-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="fecha">Fecha</Label>
-                        <div className="rounded-md border">
-                          <DatePicker
-                            selected={formData.fecha}
-                            onChange={handleDateChange}
-                            dateFormat="dd-MM-yyyy"
-                            className="w-full px-3 py-2"
-                            minDate={new Date(new Date().setHours(0, 0, 0, 0))}
-                            popperPlacement="bottom-end"
-                            showPopperArrow={false}
-                            calendarClassName="z-50"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="hora">Hora</Label>
-                        <Input
-                          id="hora"
-                          name="hora"
-                          type="time"
-                          value={formData.hora}
-                          onChange={handleInputChange}
-                          required
-                          disabled={submitting || success}
-                          className="mb-4"
-                        />
-
-                        <Label htmlFor="prevision" className="mt-4">
-                          Previsión
-                        </Label>
-                        <Select
-                          value={formData.prevision}
-                          onValueChange={(value) => handleSelectChange("prevision", value)}
-                          disabled={submitting || success}
-                        >
-                          <SelectTrigger id="prevision">
-                            <SelectValue placeholder="Selecciona previsión" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Particular">Particular</SelectItem>
-                            <SelectItem value="Fonasa">Fonasa</SelectItem>
-                            <SelectItem value="Isapre">Isapre</SelectItem>                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="profesional">
-                          Profesional Tratante
-                        </Label>
-                        <Select
-                          value={formData.profesional_id}
-                          onValueChange={(value) => handleSelectChange("profesional_id", value)}
-                          disabled={submitting || success}
-                        >
-                          <SelectTrigger id="profesional">
-                            <SelectValue placeholder="Selecciona un profesional" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {profesionales.length === 0 ? (
-                              <SelectItem value="no-profesionales" disabled>
-                                No hay profesionales disponibles
-                              </SelectItem>
-                            ) : (
-                              profesionales.map((profesional) => (
-                                <SelectItem key={profesional.id} value={profesional.id || ""}>
-                                  {profesional.nombre} ({profesional.funcion === "kinesiologa" ? "Kinesiólogo" : "Médico"})
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="motivo">Motivo</Label>
-                      <Textarea
-                        id="motivo"
-                        name="motivo"
-                        value={formData.motivo}
-                        onChange={handleInputChange}
-                        placeholder="Motivo de la cita"
-                        rows={3}
-                        disabled={submitting || success}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="button" variant="outline" onClick={resetForm} disabled={submitting}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={submitting || success || (activeTab === "paciente-existente" && !formData.pacienteId)}
-                  >
-                    {submitting ? "Guardando..." : citaEnEdicion ? "Guardar cambios" : "Agendar cita"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
-
-        {/* Diálogo de confirmación para eliminar cita */}
-        <Dialog open={!!confirmDelete} onOpenChange={(open) => !open && setConfirmDelete(null)}>
+        {/* Dialog para agregar paciente */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Confirmar eliminación</DialogTitle>
+              <DialogTitle>Agregar Paciente a la Cola</DialogTitle>
               <DialogDescription>
-                ¿Estás seguro de que deseas eliminar esta cita? Esta acción no se puede deshacer.
+                Ingresa el nombre del paciente y su turno para agregarlo a la cola de espera.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => setConfirmDelete(null)}>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre del Paciente</Label>
+                <Input
+                  id="nombre"
+                  value={nuevoFormData.nombre}
+                  onChange={(e) => setNuevoFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="turno">Turno/Hora</Label>
+                <Input
+                  id="turno"
+                  value={nuevoFormData.turno}
+                  onChange={(e) => setNuevoFormData(prev => ({ ...prev, turno: e.target.value }))}
+                  placeholder="Ej: 09:30, Turno 1, Urgente"
+                  className="w-full"
+                />
+              </div>
+
+              <Alert>
+                <Clock className="h-4 w-4" />
+                <AlertDescription>
+                  El paciente será agregado al final de la cola con estado "Esperando". 
+                  Puedes arrastrarlo para cambiar su posición.
+                </AlertDescription>
+              </Alert>
+            </div>
+
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsDialogOpen(false)}
+              >
                 Cancelar
               </Button>
-              <Button variant="destructive" onClick={() => confirmDelete && handleEliminarCita(confirmDelete)}>
-                Eliminar
+              <Button 
+                onClick={agregarPaciente}
+                disabled={!nuevoFormData.nombre.trim() || !nuevoFormData.turno.trim()}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Panel de depuración - solo visible en desarrollo */}
-        {process.env.NODE_ENV !== "production" && showDebug && (
-          <DebugCitas />
-        )}
       </div>
     </Layout>
   )

@@ -107,11 +107,14 @@ export async function getPacientesActivos(): Promise<Paciente[]> {
 
     // Filtrar los activos en memoria
     const pacientesActivos = snapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-      .filter((p) => p.activo !== false) as Paciente[]
+      .map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          ...data,
+        } as Paciente
+      })
+      .filter((p) => p.activo !== false)
 
     console.log(`Filtrados en memoria: ${pacientesActivos.length} pacientes activos`)
 
@@ -318,18 +321,29 @@ export async function actualizarPaciente(id: string, paciente: Partial<Omit<Paci
   }
 }
 
-export async function darDeAltaPaciente(id: string, notas: string) {
+export async function darDeAltaPaciente(id: string, notas: string, profesionalId?: string, profesionalNombre?: string) {
   const firestore = getDb()
   if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
     console.log(`Dando de alta al paciente con ID: ${id}`)
     const docRef = doc(firestore, "pacientes", id)
-    await updateDoc(docRef, {
+    
+    const updateData: any = {
       activo: false,
       fechaAlta: new Date().toISOString(),
       notasAlta: notas,
-    })
+    }
+    
+    // Si se proporciona el profesional que da de alta, guardarlo
+    if (profesionalId) {
+      updateData.profesional_alta_id = profesionalId
+      if (profesionalNombre) {
+        updateData.profesional_alta_nombre = profesionalNombre
+      }
+    }
+    
+    await updateDoc(docRef, updateData)
     console.log("Paciente dado de alta correctamente")
   } catch (error) {
     console.error("Error al dar de alta paciente:", error)
@@ -349,6 +363,171 @@ export async function eliminarPaciente(id: string) {
   } catch (error) {
     console.error("Error al eliminar paciente:", error)
     throw error
+  }
+}
+
+// Funciones para obtener pacientes dados de alta
+export async function getPacientesInactivos(): Promise<Paciente[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log("Obteniendo todos los pacientes dados de alta...")
+    const pacientesRef = collection(firestore, "pacientes")
+    const q = query(pacientesRef, where("activo", "==", false))
+    const snapshot = await getDocs(q)
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data()
+      
+      return {
+        id: doc.id,
+        nombre: data.nombre || "",
+        apellido: data.apellido || "",
+        rut: data.rut || "",
+        email: data.email || "",
+        telefono: data.telefono || "",
+        fechaNacimiento: data.fechaNacimiento || "",
+        direccion: data.direccion || "",
+        diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        activo: typeof data.activo === "boolean" ? data.activo : true,
+        createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+        fechaAlta: data.fechaAlta || "",
+        notasAlta: data.notasAlta || "",
+        prevision: data.prevision || "",
+        kinesiologo_id: data.kinesiologo_id || null,
+        kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || null,
+        tratante_nombre: data.tratante_nombre || null,
+        tratante_funcion: data.tratante_funcion || null,
+        profesional_alta_id: data.profesional_alta_id || null,
+        profesional_alta_nombre: data.profesional_alta_nombre || null,
+        fechaIngreso: data.fechaIngreso || "",
+      } as Paciente
+    })
+  } catch (error) {
+    console.error("Error al obtener pacientes dados de alta:", error)
+    return []
+  }
+}
+
+export async function getPacientesInactivosPorProfesional(profesionalId: string): Promise<Paciente[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`Obteniendo pacientes dados de alta del profesional ${profesionalId}...`)
+    
+    // Primero, obtener información del usuario para buscar por nombre también
+    let nombreProfesional = ""
+    try {
+      // Intentar obtener el nombre del profesional desde la colección usuarios
+      const usuarioRef = doc(firestore, "usuarios", profesionalId)
+      const usuarioDoc = await getDoc(usuarioRef)
+      if (usuarioDoc.exists()) {
+        const usuarioData = usuarioDoc.data()
+        nombreProfesional = usuarioData.nombre || usuarioData.displayName || ""
+        console.log(`Nombre del profesional encontrado: ${nombreProfesional}`)
+      }
+    } catch (error) {
+      console.log("No se pudo obtener el nombre del profesional desde usuarios:", error)
+    }
+
+    const pacientesRef = collection(firestore, "pacientes")
+    
+    // Crear las consultas por ID
+    const consultasPorId = [
+      getDocs(query(pacientesRef, where("activo", "==", false), where("kinesiologo_id", "==", profesionalId))),
+      getDocs(query(pacientesRef, where("activo", "==", false), where("tratante_id", "==", profesionalId))),
+      getDocs(query(pacientesRef, where("activo", "==", false), where("profesional_alta_id", "==", profesionalId)))
+    ]
+
+    // Si tenemos nombre del profesional, agregar consultas por nombre
+    const consultasPorNombre = nombreProfesional ? [
+      getDocs(query(pacientesRef, where("activo", "==", false), where("kinesiologo_nombre", "==", nombreProfesional))),
+      getDocs(query(pacientesRef, where("activo", "==", false), where("tratante_nombre", "==", nombreProfesional))),
+      getDocs(query(pacientesRef, where("activo", "==", false), where("profesional_alta_nombre", "==", nombreProfesional)))
+    ] : []
+
+    // Ejecutar todas las consultas
+    const todasLasConsultas = [...consultasPorId, ...consultasPorNombre]
+    const resultados = await Promise.all(todasLasConsultas)
+    
+    const [queryKinesiologo, queryTratante, queryProfesionalAlta, ...consultasNombre] = resultados
+
+    console.log(`Query kinesiologo_id encontró ${queryKinesiologo.docs.length} documentos`)
+    console.log(`Query tratante_id encontró ${queryTratante.docs.length} documentos`)
+    console.log(`Query profesional_alta_id encontró ${queryProfesionalAlta.docs.length} documentos`)
+    
+    if (consultasNombre.length > 0) {
+      consultasNombre.forEach((consulta, index) => {
+        const tipos = ["kinesiologo_nombre", "tratante_nombre", "profesional_alta_nombre"]
+        console.log(`Query ${tipos[index]} encontró ${consulta.docs.length} documentos`)
+      })
+    }
+
+    // Combinar resultados y eliminar duplicados usando Map
+    const pacientesMap = new Map()
+    
+    const procesarDocumentos = (docs: any[], tipo: string) => {
+      docs.forEach(doc => {
+        const data = doc.data()
+        console.log(`Paciente por ${tipo}:`, {
+          id: doc.id,
+          nombre: data.nombre,
+          activo: data.activo,
+          profesional: data[tipo] || data.profesional_alta_id || data.tratante_nombre || data.kinesiologo_nombre
+        })
+        
+        pacientesMap.set(doc.id, {
+          id: doc.id,
+          nombre: data.nombre || "",
+          apellido: data.apellido || "",
+          rut: data.rut || "",
+          email: data.email || "",
+          telefono: data.telefono || "",
+          fechaNacimiento: data.fechaNacimiento || "",
+          direccion: data.direccion || "",
+          diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+          antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+          activo: typeof data.activo === "boolean" ? data.activo : true,
+          createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+          fechaAlta: data.fechaAlta || "",
+          notasAlta: data.notasAlta || "",
+          prevision: data.prevision || "",
+          kinesiologo_id: data.kinesiologo_id || null,
+          kinesiologo_nombre: data.kinesiologo_nombre || null,
+          tratante_id: data.tratante_id || null,
+          tratante_nombre: data.tratante_nombre || null,
+          tratante_funcion: data.tratante_funcion || null,
+          profesional_alta_id: data.profesional_alta_id || null,
+          profesional_alta_nombre: data.profesional_alta_nombre || null,
+          fechaIngreso: data.fechaIngreso || "",
+        })
+      })
+    }
+
+    // Procesar consultas por ID
+    procesarDocumentos(queryKinesiologo.docs, "kinesiologo_id")
+    procesarDocumentos(queryTratante.docs, "tratante_id") 
+    procesarDocumentos(queryProfesionalAlta.docs, "profesional_alta_id")
+
+    // Procesar consultas por nombre si existen
+    if (consultasNombre.length > 0) {
+      const tipos = ["kinesiologo_nombre", "tratante_nombre", "profesional_alta_nombre"]
+      consultasNombre.forEach((consulta, index) => {
+        procesarDocumentos(consulta.docs, tipos[index])
+      })
+    }
+
+    const pacientes = Array.from(pacientesMap.values()) as Paciente[]
+    console.log(`Se encontraron ${pacientes.length} pacientes dados de alta para el profesional ${profesionalId}`)
+    
+    return pacientes
+  } catch (error) {
+    console.error(`Error al obtener pacientes dados de alta del profesional ${profesionalId}:`, error)
+    return []
   }
 }
 
