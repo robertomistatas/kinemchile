@@ -403,7 +403,84 @@ export async function getPacientesInactivos(): Promise<Paciente[]> {
   }
 }
 
-// Función corregida para obtener pacientes dados de alta por profesional  
+export async function getPacientesInactivosPorProfesional(nombreProfesional: string): Promise<Paciente[]> {
+  try {
+    console.log(`🔍 [DEBUG] Obteniendo pacientes dados de alta del profesional ${nombreProfesional}...`);
+    
+    const pacientesRef = collection(db, 'pacientes');
+    const pacientesEncontrados = new Map<string, Paciente>();
+
+    // ESTRATEGIA PRINCIPAL: Buscar por tratante_nombre (campo correcto identificado)
+    console.log(`🎯 [DEBUG] Buscando por tratante_nombre = ${nombreProfesional}`);
+    
+    const queryTratante1 = await getDocs(query(
+      pacientesRef,
+      where("activo", "==", false),
+      where("tratante_nombre", "==", nombreProfesional)
+    ));
+    
+    const queryTratante2 = await getDocs(query(
+      pacientesRef,
+      where("estado", "==", "inactivo"),
+      where("tratante_nombre", "==", nombreProfesional)
+    ));
+    
+    console.log(`📊 [DEBUG] Encontrados ${queryTratante1.docs.length} pacientes por tratante_nombre (activo=false)`);
+    console.log(`📊 [DEBUG] Encontrados ${queryTratante2.docs.length} pacientes por tratante_nombre (estado=inactivo)`);
+    
+    const todosLosDocs = queryTratante1.docs.concat(queryTratante2.docs);
+    todosLosDocs.forEach(doc => {
+      const data = doc.data();
+      console.log(`✅ [DEBUG] Paciente encontrado:`, {
+        id: doc.id,
+        nombre: `${data.nombre} ${data.apellido}`,
+        tratante_nombre: data.tratante_nombre,
+        fechaAlta: data.fechaAlta
+      });
+      
+      pacientesEncontrados.set(doc.id, {
+        id: doc.id,
+        nombre: data.nombre || "",
+        apellido: data.apellido || "",
+        rut: data.rut || "",
+        email: data.email || "",
+        telefono: data.telefono || "",
+        fechaNacimiento: data.fechaNacimiento || "",
+        direccion: data.direccion || "",
+        diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        activo: false,
+        createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+        fechaAlta: data.fechaAlta || "",
+        notasAlta: data.notasAlta || "",
+        prevision: data.prevision || "",
+        kinesiologo_id: data.kinesiologo_id || null,
+        kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || null,
+        tratante_nombre: data.tratante_nombre || null,
+        tratante_funcion: data.tratante_funcion || null,
+        profesional_alta_id: data.profesional_alta_id || null,
+        profesional_alta_nombre: data.profesional_alta_nombre || null,
+        fechaIngreso: data.fechaIngreso || "",
+      } as Paciente);
+    });
+
+    const resultadoFinal = Array.from(pacientesEncontrados.values());
+    
+    console.log(`🎯 [DEBUG] RESULTADO FINAL: ${resultadoFinal.length} pacientes dados de alta para el profesional ${nombreProfesional}`);
+    
+    if (resultadoFinal.length === 0) {
+      console.log(`❌ [DEBUG] No se encontraron pacientes dados de alta para este profesional`);
+    }
+    
+    return resultadoFinal;
+    
+  } catch (error) {
+    console.error(`❌ [ERROR] Error al obtener pacientes dados de alta:`, error);
+    throw error;
+  }
+}
+// Función para obtener pacientes dados de alta por profesional  
 export async function getPacientesInactivosPorProfesional(profesionalIdONombre: string): Promise<Paciente[]> {
   console.log(`🔍 [getPacientesInactivosPorProfesional] Buscando pacientes dados de alta para: ${profesionalIdONombre}`)
   
@@ -461,6 +538,325 @@ export async function getPacientesInactivosPorProfesional(profesionalIdONombre: 
     console.error("❌ [getPacientesInactivosPorProfesional] Error:", error)
     return []
   }
+
+// Funciones para sesiones
+    let nombreProfesional = ""
+    let profesionalId = ""
+    
+    if (esUID) {
+      // Si es un UID, obtener el nombre del usuario
+      profesionalId = profesionalIdONombre
+      try {
+        const usuarioRef = doc(firestore, "usuarios", profesionalId)
+        const usuarioDoc = await getDoc(usuarioRef)
+        if (usuarioDoc.exists()) {
+          const usuarioData = usuarioDoc.data()
+          nombreProfesional = usuarioData.nombre || usuarioData.displayName || ""
+          console.log(`✅ [DEBUG] Profesional encontrado por UID: ${nombreProfesional}`)
+        } else {
+          console.log(`❌ [DEBUG] No se encontró usuario con UID: ${profesionalId}`)
+        }
+      } catch (error) {
+        console.log(`⚠️ [DEBUG] Error al buscar usuario por UID:`, error)
+      }
+    } else {
+      // Si es un nombre, usarlo directamente
+      nombreProfesional = profesionalIdONombre
+      console.log(`✅ [DEBUG] Buscando directamente por nombre: ${nombreProfesional}`)
+    }
+
+    const pacientesRef = collection(firestore, "pacientes")
+    let pacientesEncontrados = new Map()
+    
+    // Primera estrategia: buscar por profesional_alta_nombre (más común y directo)
+    if (nombreProfesional) {
+      console.log(`🔍 [DEBUG] Buscando por profesional_alta_nombre = ${nombreProfesional}`)
+      
+      // Buscar con activo=false
+      const queryPorNombreAlta1 = await getDocs(query(
+        pacientesRef,
+        where("activo", "==", false),
+        where("profesional_alta_nombre", "==", nombreProfesional)
+      ))
+      
+      // Buscar con estado="inactivo"
+      const queryPorNombreAlta2 = await getDocs(query(
+        pacientesRef,
+        where("estado", "==", "inactivo"),
+        where("profesional_alta_nombre", "==", nombreProfesional)
+      ))
+      
+      console.log(`📊 [DEBUG] Encontrados ${queryPorNombreAlta1.docs.length} pacientes por profesional_alta_nombre (activo=false)`)
+      console.log(`📊 [DEBUG] Encontrados ${queryPorNombreAlta2.docs.length} pacientes por profesional_alta_nombre (estado=inactivo)`)
+      
+      // Procesar ambos resultados
+      const todosLosDocumentos = queryPorNombreAlta1.docs.concat(queryPorNombreAlta2.docs)
+      todosLosDocumentos.forEach(doc => {
+        const data = doc.data()
+        console.log(`✅ [DEBUG] Paciente encontrado por profesional_alta_nombre:`, {
+          id: doc.id,
+          nombre: `${data.nombre} ${data.apellido}`,
+          profesional_alta_nombre: data.profesional_alta_nombre,
+          fechaAlta: data.fechaAlta
+        })
+        
+        pacientesEncontrados.set(doc.id, {
+          id: doc.id,
+          nombre: data.nombre || "",
+          apellido: data.apellido || "",
+          rut: data.rut || "",
+          email: data.email || "",
+          telefono: data.telefono || "",
+          fechaNacimiento: data.fechaNacimiento || "",
+          direccion: data.direccion || "",
+          diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+          antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+          activo: false,
+          createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+          fechaAlta: data.fechaAlta || "",
+          notasAlta: data.notasAlta || "",
+          prevision: data.prevision || "",
+          kinesiologo_id: data.kinesiologo_id || null,
+          kinesiologo_nombre: data.kinesiologo_nombre || null,
+          tratante_id: data.tratante_id || null,
+          tratante_nombre: data.tratante_nombre || null,
+          tratante_funcion: data.tratante_funcion || null,
+          profesional_alta_id: data.profesional_alta_id || null,
+          profesional_alta_nombre: data.profesional_alta_nombre || null,
+          fechaIngreso: data.fechaIngreso || "",
+        } as Paciente)
+      })
+    }
+    
+    // Segunda estrategia: buscar por profesional_alta_id si tenemos el UID y no encontramos nada
+    if (pacientesEncontrados.size === 0 && profesionalId) {
+      console.log(`🔍 [DEBUG] Buscando por profesional_alta_id = ${profesionalId}`)
+      
+      const queryPorProfesionalAlta1 = await getDocs(query(
+        pacientesRef, 
+        where("activo", "==", false), 
+        where("profesional_alta_id", "==", profesionalId)
+      ))
+      
+      const queryPorProfesionalAlta2 = await getDocs(query(
+        pacientesRef, 
+        where("estado", "==", "inactivo"), 
+        where("profesional_alta_id", "==", profesionalId)
+      ))
+      
+      console.log(`📊 [DEBUG] Encontrados ${queryPorProfesionalAlta1.docs.length} pacientes por profesional_alta_id (activo=false)`)
+      console.log(`📊 [DEBUG] Encontrados ${queryPorProfesionalAlta2.docs.length} pacientes por profesional_alta_id (estado=inactivo)`)
+      
+      const todosLosProfesionalAltaDocs = queryPorProfesionalAlta1.docs.concat(queryPorProfesionalAlta2.docs)
+      todosLosProfesionalAltaDocs.forEach(doc => {
+        const data = doc.data()
+        console.log(`✅ [DEBUG] Paciente encontrado por profesional_alta_id:`, {
+          id: doc.id,
+          nombre: `${data.nombre} ${data.apellido}`,
+          profesional_alta_id: data.profesional_alta_id,
+          profesional_alta_nombre: data.profesional_alta_nombre,
+          fechaAlta: data.fechaAlta
+        })
+        
+        pacientesEncontrados.set(doc.id, {
+          id: doc.id,
+          nombre: data.nombre || "",
+          apellido: data.apellido || "",
+          rut: data.rut || "",
+          email: data.email || "",
+          telefono: data.telefono || "",
+          fechaNacimiento: data.fechaNacimiento || "",
+          direccion: data.direccion || "",
+          diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+          antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+          activo: false,
+          createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+          fechaAlta: data.fechaAlta || "",
+          notasAlta: data.notasAlta || "",
+          prevision: data.prevision || "",
+          kinesiologo_id: data.kinesiologo_id || null,
+          kinesiologo_nombre: data.kinesiologo_nombre || null,
+          tratante_id: data.tratante_id || null,
+          tratante_nombre: data.tratante_nombre || null,
+          tratante_funcion: data.tratante_funcion || null,
+          profesional_alta_id: data.profesional_alta_id || null,
+          profesional_alta_nombre: data.profesional_alta_nombre || null,
+          fechaIngreso: data.fechaIngreso || "",
+        } as Paciente)
+      })
+    }
+    
+    // Tercera estrategia: buscar por campo 'tratante_nombre' (campo correcto identificado)
+    if (pacientesEncontrados.size === 0 && nombreProfesional) {
+      console.log(`🎯 [DEBUG] Buscando por campo 'tratante_nombre' = ${nombreProfesional}`)
+      
+      // Buscar por tratante_nombre (campo correcto)
+      const queryTratante1 = await getDocs(query(
+        pacientesRef,
+        where("activo", "==", false),
+        where("tratante_nombre", "==", nombreProfesional)
+      ))
+      
+      const queryTratante2 = await getDocs(query(
+        pacientesRef,
+        where("estado", "==", "inactivo"),
+        where("tratante_nombre", "==", nombreProfesional)
+      ))
+      
+      console.log(`📊 [DEBUG] Encontrados ${queryTratante1.docs.length} pacientes por tratante_nombre (activo=false)`)
+      console.log(`📊 [DEBUG] Encontrados ${queryTratante2.docs.length} pacientes por tratante_nombre (estado=inactivo)`)
+      
+      const todosLosTratanteDocs = queryTratante1.docs.concat(queryTratante2.docs)
+      todosLosTratanteDocs.forEach(doc => {
+        const data = doc.data()
+        console.log(`✅ [DEBUG] Paciente encontrado por tratante_nombre:`, {
+          id: doc.id,
+          nombre: `${data.nombre} ${data.apellido}`,
+          tratante_nombre: data.tratante_nombre,
+          fechaAlta: data.fechaAlta
+        })
+        
+        pacientesEncontrados.set(doc.id, {
+          id: doc.id,
+          nombre: data.nombre || "",
+          apellido: data.apellido || "",
+          rut: data.rut || "",
+          email: data.email || "",
+          telefono: data.telefono || "",
+          fechaNacimiento: data.fechaNacimiento || "",
+          direccion: data.direccion || "",
+          diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+          antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+          activo: false,
+          createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+          fechaAlta: data.fechaAlta || "",
+          notasAlta: data.notasAlta || "",
+          prevision: data.prevision || "",
+          kinesiologo_id: data.kinesiologo_id || null,
+          kinesiologo_nombre: data.kinesiologo_nombre || null,
+          tratante_id: data.tratante_id || null,
+          tratante_nombre: data.tratante_nombre || null,
+          tratante_funcion: data.tratante_funcion || null,
+          profesional_alta_id: data.profesional_alta_id || null,
+          profesional_alta_nombre: data.profesional_alta_nombre || null,
+          fechaIngreso: data.fechaIngreso || "",
+        } as Paciente)
+      })
+    }
+
+    // Cuarta estrategia: si aún no encontramos nada, buscar también en tratante_nombre y kinesiologo_nombre
+    if (pacientesEncontrados.size === 0 && nombreProfesional) {
+      console.log(`🔍 [DEBUG] Buscando en campos tratante_nombre y kinesiologo_nombre por nombre...`)
+      
+      // Buscar por tratante_nombre
+      const queryTratanteNombre1 = await getDocs(query(
+        pacientesRef,
+        where("activo", "==", false),
+        where("tratante_nombre", "==", nombreProfesional)
+      ))
+      
+      const queryTratanteNombre2 = await getDocs(query(
+        pacientesRef,
+        where("estado", "==", "inactivo"),
+        where("tratante_nombre", "==", nombreProfesional)
+      ))
+      
+      // Buscar por kinesiologo_nombre
+      const queryKinesiologoNombre1 = await getDocs(query(
+        pacientesRef,
+        where("activo", "==", false),
+        where("kinesiologo_nombre", "==", nombreProfesional)
+      ))
+      
+      const queryKinesiologoNombre2 = await getDocs(query(
+        pacientesRef,
+        where("estado", "==", "inactivo"),
+        where("kinesiologo_nombre", "==", nombreProfesional)
+      ))
+      
+      console.log(`📊 [DEBUG] Encontrados ${queryTratanteNombre1.docs.length + queryTratanteNombre2.docs.length} pacientes por tratante_nombre`)
+      console.log(`📊 [DEBUG] Encontrados ${queryKinesiologoNombre1.docs.length + queryKinesiologoNombre2.docs.length} pacientes por kinesiologo_nombre`)
+      
+      // Procesar resultados - tratante_nombre
+      const todosTratanteDocs = queryTratanteNombre1.docs.concat(queryTratanteNombre2.docs)
+      todosTratanteDocs.forEach(doc => {
+        const data = doc.data()
+        if (!pacientesEncontrados.has(doc.id)) {
+          pacientesEncontrados.set(doc.id, {
+            id: doc.id,
+            nombre: data.nombre || "",
+            apellido: data.apellido || "",
+            rut: data.rut || "",
+            email: data.email || "",
+            telefono: data.telefono || "",
+            fechaNacimiento: data.fechaNacimiento || "",
+            direccion: data.direccion || "",
+            diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+            antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+            activo: false,
+            createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+            fechaAlta: data.fechaAlta || "",
+            notasAlta: data.notasAlta || "",
+            prevision: data.prevision || "",
+            kinesiologo_id: data.kinesiologo_id || null,
+            kinesiologo_nombre: data.kinesiologo_nombre || null,
+            tratante_id: data.tratante_id || null,
+            tratante_nombre: data.tratante_nombre || null,
+            tratante_funcion: data.tratante_funcion || null,
+            profesional_alta_id: data.profesional_alta_id || null,
+            profesional_alta_nombre: data.profesional_alta_nombre || null,
+            fechaIngreso: data.fechaIngreso || "",
+          } as Paciente)
+        }
+      })
+      
+      // Procesar resultados - kinesiologo_nombre
+      const todosKinesiologoDocs = queryKinesiologoNombre1.docs.concat(queryKinesiologoNombre2.docs)
+      todosKinesiologoDocs.forEach(doc => {
+        const data = doc.data()
+        if (!pacientesEncontrados.has(doc.id)) {
+          pacientesEncontrados.set(doc.id, {
+            id: doc.id,
+            nombre: data.nombre || "",
+            apellido: data.apellido || "",
+            rut: data.rut || "",
+            email: data.email || "",
+            telefono: data.telefono || "",
+            fechaNacimiento: data.fechaNacimiento || "",
+            direccion: data.direccion || "",
+            diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+            antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+            activo: false,
+            createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+            fechaAlta: data.fechaAlta || "",
+            notasAlta: data.notasAlta || "",
+            prevision: data.prevision || "",
+            kinesiologo_id: data.kinesiologo_id || null,
+            kinesiologo_nombre: data.kinesiologo_nombre || null,
+            tratante_id: data.tratante_id || null,
+            tratante_nombre: data.tratante_nombre || null,
+            tratante_funcion: data.tratante_funcion || null,
+            profesional_alta_id: data.profesional_alta_id || null,
+            profesional_alta_nombre: data.profesional_alta_nombre || null,
+            fechaIngreso: data.fechaIngreso || "",
+          } as Paciente)
+        }
+      })
+    }
+
+    const pacientes = Array.from(pacientesEncontrados.values()) as Paciente[]
+    console.log(`🎯 [DEBUG] RESULTADO FINAL: ${pacientes.length} pacientes dados de alta para el profesional ${profesionalIdONombre}`)
+    
+    if (pacientes.length > 0) {
+      console.log(`📋 [DEBUG] Lista de pacientes encontrados:`)
+      pacientes.forEach((p, i) => {
+        console.log(`   ${i+1}. ${p.nombre} ${p.apellido} - Alta: ${p.fechaAlta}`)
+      })
+    } else {
+      console.log(`❌ [DEBUG] No se encontraron pacientes dados de alta para este profesional`)
+    }
+    
+    return pacientes
 }
 
 // Funciones para sesiones

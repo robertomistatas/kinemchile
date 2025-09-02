@@ -10,45 +10,65 @@ import type { Paciente } from "@/lib/data"
 import Link from "next/link"
 
 export default function PacientesAltaPage() {
-  const { user, loading } = useAuth()
+  const { user, userInfo, loading } = useAuth()
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [dataLoading, setDataLoading] = useState(false)
   const [verTodos, setVerTodos] = useState(false)
 
   const cargarPacientes = async (mostrarTodos = false) => {
-    if (!user?.uid) return
+    if (!user?.uid || !userInfo?.nombre) {
+      console.log("❌ [PACIENTES-ALTA] No hay usuario autenticado o falta información del profesional")
+      console.log(`   user.uid: ${user?.uid}`)
+      console.log(`   userInfo.nombre: ${userInfo?.nombre}`)
+      return
+    }
     
     setDataLoading(true)
     try {
-      console.log(`Cargando pacientes. User UID: ${user.uid}, mostrarTodos: ${mostrarTodos}`)
-      console.log(`Usuario: displayName=${user.displayName}, email=${user.email}`)
+      console.log(`🔍 [PACIENTES-ALTA] Iniciando carga de pacientes...`)
+      console.log(`👤 [PACIENTES-ALTA] Usuario: UID=${user.uid}`)
+      console.log(`👤 [PACIENTES-ALTA] Usuario: displayName=${user.displayName}`)
+      console.log(`👤 [PACIENTES-ALTA] Usuario: email=${user.email}`)
+      console.log(`👩‍⚕️ [PACIENTES-ALTA] Profesional: nombre=${userInfo.nombre}`)
+      console.log(`👩‍⚕️ [PACIENTES-ALTA] Profesional: función=${userInfo.funcion}`)
+      console.log(`⚙️ [PACIENTES-ALTA] Modo: ${mostrarTodos ? 'TODOS LOS PACIENTES' : 'MIS PACIENTES'}`)
       
       let data: Paciente[] = []
       
       if (mostrarTodos) {
-        // Mostrar todos los pacientes dados de alta
-        console.log('Obteniendo TODOS los pacientes inactivos...')
+        console.log('📋 [PACIENTES-ALTA] Obteniendo TODOS los pacientes inactivos...')
         data = await getPacientesInactivos()
       } else {
-        // Mostrar solo pacientes dados de alta del profesional actual
-        console.log(`Obteniendo pacientes inactivos del profesional: ${user.uid}`)
-        data = await getPacientesInactivosPorProfesional(user.uid)
+        console.log(`🎯 [PACIENTES-ALTA] Obteniendo pacientes inactivos del profesional: ${userInfo.nombre}`)
+        data = await getPacientesInactivosPorProfesional(userInfo.nombre)
       }
       
-      console.log(`Pacientes obtenidos: ${data.length}`)
+      console.log(`📊 [PACIENTES-ALTA] Resultado: ${data.length} pacientes obtenidos`)
+      if (data.length > 0) {
+        console.log(`📋 [PACIENTES-ALTA] Pacientes encontrados:`)
+        data.forEach((p, i) => {
+          console.log(`   ${i+1}. ${p.nombre} ${p.apellido} - Alta por: ${p.profesional_alta_nombre || 'N/A'}`)
+        })
+      } else {
+        console.log(`❌ [PACIENTES-ALTA] No se encontraron pacientes`)
+        if (!mostrarTodos) {
+          console.log(`💡 [PACIENTES-ALTA] Sugerencia: Verificar que el profesional ${userInfo.nombre} tenga pacientes dados de alta asignados`)
+        }
+      }
+      
       setPacientes(data)
     } catch (error) {
-      console.error("Error al cargar pacientes dados de alta:", error)
+      console.error("💥 [PACIENTES-ALTA] Error al cargar pacientes dados de alta:", error)
     } finally {
       setDataLoading(false)
     }
   }
 
   useEffect(() => {
-    if (user) {
+    if (user && userInfo) {
       cargarPacientes(verTodos)
     }
-  }, [user, verTodos])
+  }, [user, userInfo, verTodos])
 
   const handleToggleVerTodos = () => {
     const nuevoVerTodos = !verTodos
