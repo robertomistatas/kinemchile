@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,7 +11,7 @@ import { getPaciente, getSesionesPaciente, actualizarPaciente } from "@/lib/fire
 import type { Paciente, Sesion, Usuario } from "@/lib/data"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit, Save, X } from "lucide-react"
+import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit, Save, X, Clock, Calendar, Stethoscope, FileText, Activity, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label"
 export default function PacienteDetallePage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { id } = useParams() as { id: string }
   const [paciente, setPaciente] = useState<Paciente | null>(null)
   const [sesiones, setSesiones] = useState<Sesion[]>([])
@@ -44,10 +45,44 @@ export default function PacienteDetallePage() {
   const [showAltaDialog, setShowAltaDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("informacion")
 
+  // Detectar si viene desde la agenda
+  const fromAgenda = searchParams?.get('from') === 'agenda'
+
   // Estados para edición de sesiones
   const [editingSesionId, setEditingSesionId] = useState<string | null>(null)
   const [editingSesionData, setEditingSesionData] = useState<{ fecha: string; notas: string } | null>(null)
   const [savingSesion, setSavingSesion] = useState(false)
+
+  // Función para obtener información de la última sesión
+  const getUltimaVisitaInfo = () => {
+    if (sesiones.length === 0) return null
+    
+    const ultimaSesion = sesiones.sort((a, b) => 
+      new Date(b.fecha).getTime() - new Date(a.fecha).getTime()
+    )[0]
+    
+    return {
+      fecha: ultimaSesion.fecha,
+      tratamiento: ultimaSesion.tratamiento || 'No especificado',
+      observaciones: ultimaSesion.observaciones || 'Sin observaciones'
+    }
+  }
+
+  // Función para obtener patologías desde evaluaciones
+  const getPatologias = () => {
+    if (evaluaciones.length === 0) return []
+    
+    const patologias = evaluaciones
+      .filter(evaluacion => evaluacion.diagnostico || evaluacion.observaciones)
+      .map(evaluacion => ({
+        fecha: evaluacion.fecha,
+        diagnostico: evaluacion.diagnostico || '',
+        observaciones: evaluacion.observaciones || ''
+      }))
+      .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    
+    return patologias.slice(0, 3) // Últimas 3 evaluaciones
+  }
   
   // Estados para ordenamiento
   const [ordenSesiones, setOrdenSesiones] = useState<'asc' | 'desc'>('desc') // Más recientes primero
@@ -486,6 +521,80 @@ export default function PacienteDetallePage() {
             )}
           </div>
         </div>
+
+        {/* Resumen médico cuando viene desde la agenda */}
+        {fromAgenda && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 no-print">
+            <div className="flex items-center gap-2 mb-3">
+              <Stethoscope className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-semibold text-blue-800">Resumen para Consulta Médica</h2>
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Información de la última visita */}
+              <div className="bg-white p-3 rounded border">
+                <h3 className="font-medium text-gray-800 mb-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Última Visita
+                </h3>
+                {(() => {
+                  const ultimaVisita = getUltimaVisitaInfo()
+                  if (!ultimaVisita) {
+                    return (
+                      <p className="text-sm text-gray-500 italic">Sin visitas registradas</p>
+                    )
+                  }
+                  return (
+                    <div className="text-sm space-y-1">
+                      <p><span className="font-medium">Fecha:</span> {new Date(ultimaVisita.fecha).toLocaleDateString()}</p>
+                      <p><span className="font-medium">Tratamiento:</span> {ultimaVisita.tratamiento}</p>
+                      <p><span className="font-medium">Observaciones:</span> {ultimaVisita.observaciones}</p>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Patologías recientes */}
+              <div className="bg-white p-3 rounded border">
+                <h3 className="font-medium text-gray-800 mb-2 flex items-center gap-2">
+                  <Activity className="h-4 w-4" />
+                  Diagnósticos Recientes
+                </h3>
+                {(() => {
+                  const patologias = getPatologias()
+                  if (patologias.length === 0) {
+                    return (
+                      <p className="text-sm text-gray-500 italic">Sin evaluaciones registradas</p>
+                    )
+                  }
+                  return (
+                    <div className="space-y-2">
+                      {patologias.map((patologia, index) => (
+                        <div key={index} className="text-sm border-l-2 border-blue-200 pl-2">
+                          <p className="font-medium">{new Date(patologia.fecha).toLocaleDateString()}</p>
+                          {patologia.diagnostico && (
+                            <p className="text-gray-700">{patologia.diagnostico}</p>
+                          )}
+                          {patologia.observaciones && (
+                            <p className="text-gray-600 text-xs">{patologia.observaciones}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+
+            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm">
+              <div className="flex items-center gap-2 text-amber-700">
+                <Clock className="h-4 w-4" />
+                <span className="font-medium">Información completa disponible en las pestañas de Evaluaciones e Historial de Sesiones</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Título para impresión */}
         <div className="hidden print:block print:mb-6">

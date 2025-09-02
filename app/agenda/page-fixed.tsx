@@ -230,7 +230,6 @@ export default function ColaEsperaPage() {
   const [isBuscarPacienteOpen, setIsBuscarPacienteOpen] = useState(false)
   const [editandoPaciente, setEditandoPaciente] = useState<PacienteEspera | null>(null)
   const [loading, setLoading] = useState(true)
-  const [lastSync, setLastSync] = useState<Date | null>(null)
   const [nuevoFormData, setNuevoFormData] = useState({
     nombre: '',
     turno: ''
@@ -258,7 +257,6 @@ export default function ColaEsperaPage() {
       
       const pacientes = await getColaEsperaDia()
       setPacientesEspera(pacientes)
-      setLastSync(new Date())
       
       console.log(`✅ Cola cargada: ${pacientes.length} pacientes`)
     } catch (error) {
@@ -281,36 +279,6 @@ export default function ColaEsperaPage() {
       } catch (error) {
         console.error('❌ Error al cargar configuración:', error)
       }
-    }
-
-    // Configurar actualización periódica cada 30 segundos
-    const interval = setInterval(() => {
-      console.log('🔄 Actualizando cola automáticamente...')
-      cargarColaDia()
-    }, 30000)
-
-    // Listener para cuando la ventana recupera el foco
-    const handleFocus = () => {
-      console.log('🔄 Ventana recuperó el foco, actualizando cola...')
-      cargarColaDia()
-    }
-
-    // Listener para cambios de visibilidad de la página
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('🔄 Página visible, actualizando cola...')
-        cargarColaDia()
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Cleanup
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
@@ -590,26 +558,19 @@ export default function ColaEsperaPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Cola de Espera - Firestore</h1>
+            <h1 className="text-3xl font-bold">Cola de Espera</h1>
             <div className="flex items-center gap-2 text-gray-600 mt-1">
               <Calendar className="h-4 w-4" />
-              <p>Sistema multi-computador - {new Date().toLocaleDateString('es-CL', { 
+              <p>Gestión de pacientes en espera - {new Date().toLocaleDateString('es-CL', { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
                 day: 'numeric' 
               })}</p>
             </div>
-            <div className="flex items-center gap-4 text-sm mt-1">
-              <p className="text-blue-600">
-                📅 La cola se mantiene durante todo el día y se sincroniza entre computadores
-              </p>
-              {lastSync && (
-                <p className="text-green-600">
-                  🔄 Última sync: {lastSync.toLocaleTimeString()}
-                </p>
-              )}
-            </div>
+            <p className="text-sm text-blue-600 mt-1">
+              📅 La cola se mantiene durante todo el día y se renueva automáticamente cada día
+            </p>
           </div>
           <Button 
             onClick={() => setIsBuscarPacienteOpen(true)}
@@ -744,12 +705,13 @@ export default function ColaEsperaPage() {
 
             <Button 
               variant="outline" 
-              onClick={cargarColaDia}
-              className="text-green-600 border-green-200 hover:bg-green-50"
-              title="Recargar cola desde Firestore"
+              onClick={limpiarAtendidos}
+              disabled={true}
+              className="opacity-50"
+              title="Los pacientes atendidos se mantienen en la cola del día"
             >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Recargar Cola
+              <UserCheck className="h-4 w-4 mr-2" />
+              Atendidos del día ({stats.atendidos})
             </Button>
             
             <Button 
@@ -916,8 +878,8 @@ export default function ColaEsperaPage() {
 
         {/* Dialog para buscar pacientes */}
         <BuscarPacienteDialog
-          open={isBuscarPacienteOpen}
-          onOpenChange={setIsBuscarPacienteOpen}
+          isOpen={isBuscarPacienteOpen}
+          onClose={() => setIsBuscarPacienteOpen(false)}
           onPacienteSeleccionado={manejarPacienteSeleccionado}
         />
       </div>

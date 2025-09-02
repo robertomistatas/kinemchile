@@ -183,3 +183,18 @@ export const FUNCIONES = {
   MEDICO: "medico",
   ADMINISTRATIVO: "administrativo",
 }
+
+// Interface para la cola de espera
+export interface PacienteEspera {
+  id: string
+  nombre: string
+  turno: string
+  color: string
+  estado: 'esperando' | 'en-consulta' | 'atendido'
+  horaIngreso: Date
+  pacienteId?: string // ID del paciente en la base de datos
+  rut?: string
+  tieneFicha: boolean // Si tiene ficha médica o es solo para atención sin ficha
+  fechaCola: string // Fecha en formato YYYY-MM-DD
+  orden?: number // Orden en la cola para mantener secuencia
+}

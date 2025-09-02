@@ -106,32 +106,32 @@ function PacienteItem({ paciente, onCambiarEstado, onEliminar, onVerFicha }: {
   const getEstadoInfo = () => {
     switch (paciente.estado) {
       case 'esperando':
-        return {
-          texto: 'Esperando',
-          color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-          boton: 'Atender',
-          colorBoton: 'bg-blue-500 hover:bg-blue-600'
+        return { 
+          texto: 'Esperando', 
+          clase: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          icono: <Clock className="h-4 w-4" />,
+          boton: { texto: 'Atender', clase: 'bg-blue-600 hover:bg-blue-700' }
         }
       case 'en-consulta':
-        return {
-          texto: 'En Consulta',
-          color: 'bg-blue-100 text-blue-800 border-blue-300',
-          boton: 'Finalizar',
-          colorBoton: 'bg-green-500 hover:bg-green-600'
+        return { 
+          texto: 'En consulta', 
+          clase: 'bg-blue-100 text-blue-800 border-blue-200',
+          icono: <UserCheck className="h-4 w-4" />,
+          boton: { texto: 'Finalizar', clase: 'bg-green-600 hover:bg-green-700' }
         }
       case 'atendido':
-        return {
-          texto: 'Atendido',
-          color: 'bg-green-100 text-green-800 border-green-300',
-          boton: 'Volver',
-          colorBoton: 'bg-yellow-500 hover:bg-yellow-600'
+        return { 
+          texto: 'Atendido', 
+          clase: 'bg-green-100 text-green-800 border-green-200',
+          icono: <UserCheck className="h-4 w-4" />,
+          boton: { texto: 'Volver a cola', clase: 'bg-gray-600 hover:bg-gray-700' }
         }
       default:
-        return {
-          texto: 'Desconocido',
-          color: 'bg-gray-100 text-gray-800 border-gray-300',
-          boton: 'Acción',
-          colorBoton: 'bg-gray-500 hover:bg-gray-600'
+        return { 
+          texto: 'Esperando', 
+          clase: 'bg-gray-100 text-gray-800 border-gray-200',
+          icono: <Clock className="h-4 w-4" />,
+          boton: { texto: 'Atender', clase: 'bg-blue-600 hover:bg-blue-700' }
         }
     }
   }
@@ -139,86 +139,101 @@ function PacienteItem({ paciente, onCambiarEstado, onEliminar, onVerFicha }: {
   const estadoInfo = getEstadoInfo()
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="p-4 border rounded-lg shadow-sm bg-white hover:shadow-md transition-shadow"
+    <Card 
+      ref={setNodeRef} 
+      style={style} 
+      className={`mb-3 cursor-move border-l-4 hover:shadow-md transition-all duration-200 ${
+        isDragging ? 'shadow-xl scale-105' : ''
+      } ${paciente.estado === 'atendido' ? 'opacity-60' : ''}`}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing"
-          >
-            <GripVertical className="h-5 w-5 text-gray-400" />
-          </div>
-          
-          <div
-            className="w-4 h-4 rounded-full border-2"
-            style={{ 
-              backgroundColor: paciente.color,
-              borderColor: paciente.color 
-            }}
-          />
-          
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              {paciente.pacienteId && paciente.tieneFicha ? (
-                <button
-                  onClick={() => onVerFicha(paciente.pacienteId!)}
-                  className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                >
-                  {paciente.nombre}
-                </button>
-              ) : (
-                <h3 className="font-medium text-gray-900">{paciente.nombre}</h3>
-              )}
+      <div 
+        className="border-l-4" 
+        style={{ borderLeftColor: paciente.color }}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div 
+                {...attributes} 
+                {...listeners}
+                className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 transition-colors"
+              >
+                <GripVertical className="h-5 w-5 text-gray-400" />
+              </div>
               
-              {paciente.tieneFicha && (
-                <Badge variant="secondary" className="text-xs">
-                  Con ficha
-                </Badge>
-              )}
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                  {paciente.tieneFicha && paciente.pacienteId ? (
+                    <button
+                      onClick={() => onVerFicha(paciente.pacienteId!)}
+                      className="text-lg font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                    >
+                      {paciente.nombre}
+                    </button>
+                  ) : (
+                    <h3 className="font-semibold text-lg">{paciente.nombre}</h3>
+                  )}
+                  <span 
+                    className="w-3 h-3 rounded-full border border-gray-200"
+                    style={{ backgroundColor: paciente.color }}
+                  />
+                  {paciente.tieneFicha ? (
+                    <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      Con ficha
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-xs">
+                      <UserX className="h-3 w-3 mr-1" />
+                      Sin ficha
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mb-1">Turno: <span className="font-medium">{paciente.turno}</span></p>
+                {paciente.rut && (
+                  <p className="text-xs text-gray-500 mb-1">RUT: {paciente.rut}</p>
+                )}
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    Ingreso: {paciente.horaIngreso.toLocaleTimeString('es-CL', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                  <span>
+                    Esperando: {Math.floor((Date.now() - paciente.horaIngreso.getTime()) / 60000)} min
+                  </span>
+                </div>
+              </div>
             </div>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <span>Turno: {paciente.turno}</span>
-              {paciente.rut && <span>• RUT: {paciente.rut}</span>}
-            </div>
-            
-            <div className="flex items-center space-x-2 text-xs text-gray-500">
-              <Clock className="h-3 w-3" />
-              <span>Ingreso: {paciente.horaIngreso.toLocaleTimeString()}</span>
-              <span>• Esperando: {Math.floor((new Date().getTime() - paciente.horaIngreso.getTime()) / 60000)} min</span>
+
+            <div className="flex items-center space-x-2">
+              <div className={`px-3 py-1 rounded-full text-xs font-medium border ${estadoInfo.clase} flex items-center space-x-1`}>
+                {estadoInfo.icono}
+                <span>{estadoInfo.texto}</span>
+              </div>
+              
+              <Button
+                size="sm"
+                onClick={() => onCambiarEstado(paciente.id)}
+                className={estadoInfo.boton.clase}
+              >
+                {estadoInfo.boton.texto}
+              </Button>
+              
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onEliminar(paciente.id)}
+                className="text-red-600 hover:bg-red-50 border-red-200"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        </div>
-        
-        <div className="flex items-center space-x-2">
-          <Badge className={estadoInfo.color}>
-            {estadoInfo.texto}
-          </Badge>
-          
-          <Button
-            size="sm"
-            onClick={() => onCambiarEstado(paciente.id)}
-            className={`${estadoInfo.colorBoton} text-white`}
-          >
-            {estadoInfo.boton}
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEliminar(paciente.id)}
-            className="text-red-600 border-red-300 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+        </CardContent>
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -230,7 +245,6 @@ export default function ColaEsperaPage() {
   const [isBuscarPacienteOpen, setIsBuscarPacienteOpen] = useState(false)
   const [editandoPaciente, setEditandoPaciente] = useState<PacienteEspera | null>(null)
   const [loading, setLoading] = useState(true)
-  const [lastSync, setLastSync] = useState<Date | null>(null)
   const [nuevoFormData, setNuevoFormData] = useState({
     nombre: '',
     turno: ''
@@ -258,7 +272,6 @@ export default function ColaEsperaPage() {
       
       const pacientes = await getColaEsperaDia()
       setPacientesEspera(pacientes)
-      setLastSync(new Date())
       
       console.log(`✅ Cola cargada: ${pacientes.length} pacientes`)
     } catch (error) {
@@ -281,36 +294,6 @@ export default function ColaEsperaPage() {
       } catch (error) {
         console.error('❌ Error al cargar configuración:', error)
       }
-    }
-
-    // Configurar actualización periódica cada 30 segundos
-    const interval = setInterval(() => {
-      console.log('🔄 Actualizando cola automáticamente...')
-      cargarColaDia()
-    }, 30000)
-
-    // Listener para cuando la ventana recupera el foco
-    const handleFocus = () => {
-      console.log('🔄 Ventana recuperó el foco, actualizando cola...')
-      cargarColaDia()
-    }
-
-    // Listener para cambios de visibilidad de la página
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('🔄 Página visible, actualizando cola...')
-        cargarColaDia()
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    // Cleanup
-    return () => {
-      clearInterval(interval)
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
 
@@ -441,7 +424,7 @@ export default function ColaEsperaPage() {
   // Navegar a la ficha del paciente
   const verFichaPaciente = (pacienteId: string) => {
     console.log(`📋 Abriendo ficha del paciente: ${pacienteId}`)
-    router.push(`/pacientes/${pacienteId}?from=agenda`)
+    router.push(`/pacientes/${pacienteId}`)
   }
 
   // Cambiar estado del paciente
@@ -527,7 +510,7 @@ export default function ColaEsperaPage() {
     }
   }
 
-  // Exportar cola a archivo JSON
+  // Exportar/Importar cola
   const exportarCola = () => {
     const data = {
       pacientes: pacientesEspera,
@@ -545,7 +528,6 @@ export default function ColaEsperaPage() {
     URL.revokeObjectURL(url)
   }
 
-  // Importar cola desde archivo JSON
   const importarCola = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -590,26 +572,19 @@ export default function ColaEsperaPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Cola de Espera - Firestore</h1>
+            <h1 className="text-3xl font-bold">Cola de Espera</h1>
             <div className="flex items-center gap-2 text-gray-600 mt-1">
               <Calendar className="h-4 w-4" />
-              <p>Sistema multi-computador - {new Date().toLocaleDateString('es-CL', { 
+              <p>Gestión de pacientes en espera - {new Date().toLocaleDateString('es-CL', { 
                 weekday: 'long', 
                 year: 'numeric', 
                 month: 'long', 
                 day: 'numeric' 
               })}</p>
             </div>
-            <div className="flex items-center gap-4 text-sm mt-1">
-              <p className="text-blue-600">
-                📅 La cola se mantiene durante todo el día y se sincroniza entre computadores
-              </p>
-              {lastSync && (
-                <p className="text-green-600">
-                  🔄 Última sync: {lastSync.toLocaleTimeString()}
-                </p>
-              )}
-            </div>
+            <p className="text-sm text-blue-600 mt-1">
+              📅 La cola se mantiene durante todo el día y se renueva automáticamente cada día
+            </p>
           </div>
           <Button 
             onClick={() => setIsBuscarPacienteOpen(true)}
@@ -633,190 +608,187 @@ export default function ColaEsperaPage() {
         {/* Estadísticas */}
         {!loading && (
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Users className="h-5 w-5 text-gray-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                    <p className="text-sm text-gray-600">Total</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5 text-yellow-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-yellow-600">{stats.esperando}</p>
-                    <p className="text-sm text-gray-600">Esperando</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <UserCheck className="h-5 w-5 text-blue-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">{stats.enConsulta}</p>
-                    <p className="text-sm text-gray-600">En Consulta</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <UserCheck className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">{stats.atendidos}</p>
-                    <p className="text-sm text-gray-600">Atendidos</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">{stats.conFicha}</p>
-                    <p className="text-sm text-gray-600">Con Ficha</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-2">
-                  <UserX className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="text-2xl font-bold text-orange-600">{stats.sinFicha}</p>
-                    <p className="text-sm text-gray-600">Sin Ficha</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Información de persistencia diaria */}
-        {!loading && (
-          <Card className="bg-blue-50 border-blue-200">
+          <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <Calendar className="h-6 w-6 text-blue-600" />
-                  <div>
-                    <h3 className="font-semibold text-blue-800">Cola del Día - {new Date().toLocaleDateString('es-CL')}</h3>
-                    <p className="text-sm text-blue-600">
-                      Los pacientes permanecen en la cola durante todo el día. La cola se renueva automáticamente cada día.
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-blue-800">{stats.total}</p>
-                  <p className="text-sm text-blue-600">Total del día</p>
+              <div className="flex items-center space-x-2">
+                <Users className="h-5 w-5 text-gray-500" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-gray-600">Total</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-        )}
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-yellow-500" />
+                <div>
+                  <p className="text-2xl font-bold text-yellow-600">{stats.esperando}</p>
+                  <p className="text-sm text-gray-600">Esperando</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-5 w-5 text-blue-500" />
+                <div>
+                  <p className="text-2xl font-bold text-blue-600">{stats.enConsulta}</p>
+                  <p className="text-sm text-gray-600">En Consulta</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <UserCheck className="h-5 w-5 text-green-500" />
+                <div>
+                  <p className="text-2xl font-bold text-green-600">{stats.atendidos}</p>
+                  <p className="text-sm text-gray-600">Atendidos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <FileText className="h-5 w-5 text-green-500" />
+                <div>
+                  <p className="text-2xl font-bold text-green-600">{stats.conFicha}</p>
+                  <p className="text-sm text-gray-600">Con Ficha</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2">
+                <UserX className="h-5 w-5 text-orange-500" />
+                <div>
+                  <p className="text-2xl font-bold text-orange-600">{stats.sinFicha}</p>
+                  <p className="text-sm text-gray-600">Sin Ficha</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Información de persistencia diaria */}
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Calendar className="h-6 w-6 text-blue-600" />
+                <div>
+                  <h3 className="font-semibold text-blue-800">Cola del Día - {new Date().toLocaleDateString('es-CL')}</h3>
+                  <p className="text-sm text-blue-600">
+                    Los pacientes permanecen en la cola durante todo el día. La cola se renueva automáticamente cada día.
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-bold text-blue-800">{stats.total}</p>
+                <p className="text-sm text-blue-600">Total del día</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Acciones rápidas */}
-        {!loading && (
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsDialogOpen(true)}
-              className="text-blue-600 border-blue-200 hover:bg-blue-50"
-            >
-              <Edit className="h-4 w-4 mr-2" />
-              Agregar Manual
-            </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setIsDialogOpen(true)}
+            className="text-blue-600 border-blue-200 hover:bg-blue-50"
+          >
+            <Edit className="h-4 w-4 mr-2" />
+            Agregar Manual
+          </Button>
 
-            <Button 
-              variant="outline" 
-              onClick={cargarColaDia}
-              className="text-green-600 border-green-200 hover:bg-green-50"
-              title="Recargar cola desde Firestore"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Recargar Cola
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={resetearCola}
-              disabled={stats.total === 0}
-              className="text-red-600 border-red-200 hover:bg-red-50"
-              title="Elimina todos los pacientes de la cola del día actual"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Resetear Cola del Día
-            </Button>
+          <Button 
+            variant="outline" 
+            onClick={limpiarAtendidos}
+            disabled={true}
+            className="opacity-50"
+            title="Los pacientes atendidos se mantienen en la cola del día"
+          >
+            <UserCheck className="h-4 w-4 mr-2" />
+            Atendidos del día ({stats.atendidos})
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            onClick={resetearCola}
+            disabled={stats.total === 0}
+            className="text-red-600 border-red-200 hover:bg-red-50"
+            title="Elimina todos los pacientes de la cola del día actual"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Resetear Cola del Día
+          </Button>
 
-            {/* Botón de debug temporal */}
-            <Button 
-              variant="outline" 
-              onClick={async () => {
-                console.log('🔍 DEBUG - Estado actual pacientesEspera:', pacientesEspera)
+          {/* Botón de debug temporal */}
+          <Button 
+            variant="outline" 
+            onClick={async () => {
+              console.log('🔍 DEBUG - Estado actual pacientesEspera:', pacientesEspera)
+              
+              try {
+                const pacientesFirestore = await getColaEsperaDia()
+                console.log('🔍 DEBUG - Datos en Firestore:', pacientesFirestore)
                 
-                try {
-                  const pacientesFirestore = await getColaEsperaDia()
-                  console.log('🔍 DEBUG - Datos en Firestore:', pacientesFirestore)
-                  
-                  const estadisticas = await getEstadisticasColaDia()
-                  console.log('🔍 DEBUG - Estadísticas:', estadisticas)
-                  
-                  alert(`Debug info (ver consola):\nEstado local: ${pacientesEspera.length} pacientes\nFirestore: ${pacientesFirestore.length} pacientes\nÚltima carga: ${loading ? 'Cargando...' : 'Completada'}`)
-                } catch (error) {
-                  console.error('🔍 DEBUG - Error:', error)
-                  alert('Error al obtener debug info: ' + error)
-                }
-              }}
-              className="text-purple-600 border-purple-200 hover:bg-purple-50"
-            >
-              🐛 Debug Firestore
-            </Button>
+                const estadisticas = await getEstadisticasColaDia()
+                console.log('🔍 DEBUG - Estadísticas:', estadisticas)
+                
+                alert(`Debug info (ver consola):\nEstado local: ${pacientesEspera.length} pacientes\nFirestore: ${pacientesFirestore.length} pacientes\nÚltima carga: ${loading ? 'Cargando...' : 'Completada'}`)
+              } catch (error) {
+                console.error('🔍 DEBUG - Error:', error)
+                alert('Error al obtener debug info: ' + error)
+              }
+            }}
+            className="text-purple-600 border-purple-200 hover:bg-purple-50"
+          >
+            🐛 Debug Firestore
+          </Button>
 
-            <ConfiguracionCola 
-              configuracion={configuracion}
-              onActualizar={setConfiguracion}
+          <ConfiguracionCola 
+            configuracion={configuracion}
+            onActualizar={setConfiguracion}
+          />
+
+          <Button 
+            variant="outline" 
+            onClick={exportarCola}
+            disabled={stats.total === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
+          </Button>
+
+          <div className="relative">
+            <input
+              type="file"
+              accept=".json"
+              onChange={importarCola}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              id="importar-cola"
             />
-
-            <Button 
-              variant="outline" 
-              onClick={exportarCola}
-              disabled={stats.total === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
+            <Button variant="outline" asChild>
+              <label htmlFor="importar-cola" className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Importar
+              </label>
             </Button>
-
-            <div className="relative">
-              <input
-                type="file"
-                accept=".json"
-                onChange={importarCola}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                id="importar-cola"
-              />
-              <Button variant="outline" asChild>
-                <label htmlFor="importar-cola" className="cursor-pointer">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar
-                </label>
-              </Button>
-            </div>
           </div>
+        </div>
         )}
 
         {/* Cola de pacientes */}
@@ -831,33 +803,27 @@ export default function ColaEsperaPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-              </div>
-            ) : pacientesEspera.length === 0 ? (
+            {pacientesEspera.length === 0 ? (
               <div className="text-center py-12">
-                <Users className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No hay pacientes en cola</h3>
-                <p className="mt-1 text-sm text-gray-500">Agrega el primer paciente para comenzar</p>
-                <div className="mt-6">
-                  <Button onClick={() => setIsBuscarPacienteOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Agregar Paciente
-                  </Button>
-                </div>
+                <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-500 mb-2">No hay pacientes en cola</h3>
+                <p className="text-gray-400 mb-4">Agrega el primer paciente para comenzar</p>
+                <Button onClick={() => setIsBuscarPacienteOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Paciente
+                </Button>
               </div>
             ) : (
-              <DndContext
+              <DndContext 
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
-                <SortableContext
+                <SortableContext 
                   items={pacientesEspera.map(p => p.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {pacientesEspera.map((paciente) => (
                       <PacienteItem
                         key={paciente.id}
@@ -874,47 +840,68 @@ export default function ColaEsperaPage() {
           </CardContent>
         </Card>
 
-        {/* Dialog para agregar paciente manualmente */}
+        {/* Dialog para agregar paciente */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Agregar Paciente Manualmente</DialogTitle>
+              <DialogTitle>Agregar Paciente a la Cola</DialogTitle>
               <DialogDescription>
                 Ingresa el nombre del paciente y su turno para agregarlo a la cola de espera.
               </DialogDescription>
             </DialogHeader>
+            
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="nombre">Nombre del paciente</Label>
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre del Paciente</Label>
                 <Input
                   id="nombre"
                   value={nuevoFormData.nombre}
                   onChange={(e) => setNuevoFormData(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder="Juan Pérez"
+                  placeholder="Ej: Juan Pérez"
+                  className="w-full"
                 />
               </div>
-              <div>
-                <Label htmlFor="turno">Turno</Label>
+              
+              <div className="space-y-2">
+                <Label htmlFor="turno">Turno/Hora</Label>
                 <Input
                   id="turno"
                   value={nuevoFormData.turno}
                   onChange={(e) => setNuevoFormData(prev => ({ ...prev, turno: e.target.value }))}
-                  placeholder="14:30"
+                  placeholder="Ej: 09:30, Turno 1, Urgente"
+                  className="w-full"
                 />
               </div>
+
+              <Alert>
+                <Clock className="h-4 w-4" />
+                <AlertDescription>
+                  El paciente será agregado al final de la cola con estado "Esperando". 
+                  Puedes arrastrarlo para cambiar su posición.
+                </AlertDescription>
+              </Alert>
             </div>
+
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsDialogOpen(false)}
+              >
                 Cancelar
               </Button>
-              <Button onClick={agregarPaciente}>
-                Agregar a la Cola
+              <Button 
+                onClick={agregarPaciente}
+                disabled={!nuevoFormData.nombre.trim() || !nuevoFormData.turno.trim()}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
-        {/* Dialog para buscar pacientes */}
+        {/* Dialog para buscar paciente */}
         <BuscarPacienteDialog
           open={isBuscarPacienteOpen}
           onOpenChange={setIsBuscarPacienteOpen}

@@ -15,7 +15,7 @@ import {
   serverTimestamp,
   deleteField,
 } from "@/lib/firebase"
-import type { Paciente, Sesion, Cita, Usuario } from "./data"
+import type { Paciente, Sesion, Cita, Usuario, PacienteEspera } from "./data"
 
 // Función para obtener la instancia de Firestore
 function getDb() {
@@ -1390,6 +1390,315 @@ export async function getProfesionales(): Promise<Usuario[]> {
     } catch (secondError) {
       console.error("Error al obtener profesionales:", secondError)
       return []
+    }
+  }
+}
+
+// Función para buscar pacientes por nombre o RUT (para uso en agenda)
+export async function buscarPacientes(termino: string): Promise<Paciente[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`🔍 Buscando pacientes con término: "${termino}"`)
+    
+    if (!termino || termino.trim().length < 2) {
+      return []
+    }
+
+    const terminoLimpio = termino.trim().toLowerCase()
+    const pacientesRef = collection(firestore, "pacientes")
+    
+    // Obtener todos los pacientes activos para búsqueda en memoria
+    const q = query(pacientesRef, where("activo", "==", true))
+    const snapshot = await getDocs(q)
+    
+    const pacientesEncontrados: Paciente[] = []
+    
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data()
+      const paciente = {
+        id: doc.id,
+        nombre: data.nombre || "",
+        apellido: data.apellido || "",
+        rut: data.rut || "",
+        email: data.email || "",
+        telefono: data.telefono || "",
+        fechaNacimiento: data.fechaNacimiento || "",
+        direccion: data.direccion || "",
+        diagnostico: data.diagnostico || data.diagnosticoMedico || "",
+        antecedentesPersonales: data.antecedentesPersonales || data.antecedentesClinicosRelevantes || "",
+        activo: typeof data.activo === "boolean" ? data.activo : true,
+        createdAt: data.createdAt ? data.createdAt.toString() : Date.now().toString(),
+        fechaAlta: data.fechaAlta || null,
+        notasAlta: data.notasAlta || null,
+        prevision: data.prevision || "",
+        kinesiologo_id: data.kinesiologo_id || null,
+        kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || null,
+        tratante_nombre: data.tratante_nombre || null,
+        tratante_funcion: data.tratante_funcion || null,
+        fechaIngreso: data.fechaIngreso || "",
+      } as Paciente
+      
+      // Buscar por nombre completo
+      const nombreCompleto = `${paciente.nombre} ${paciente.apellido}`.toLowerCase()
+      
+      // Buscar por RUT (con y sin puntos/guiones)
+      const rutLimpio = paciente.rut.replace(/[.-]/g, '').toLowerCase()
+      const terminoRut = terminoLimpio.replace(/[.-]/g, '')
+      
+      // Verificar coincidencias
+      const coincideNombre = nombreCompleto.includes(terminoLimpio) ||
+                            paciente.nombre.toLowerCase().includes(terminoLimpio) ||
+                            paciente.apellido.toLowerCase().includes(terminoLimpio)
+      
+      const coincideRut = rutLimpio.includes(terminoRut) || paciente.rut.toLowerCase().includes(terminoLimpio)
+      
+      if (coincideNombre || coincideRut) {
+        pacientesEncontrados.push(paciente)
+      }
+    })
+    
+    console.log(`📋 Encontrados ${pacientesEncontrados.length} pacientes que coinciden con "${termino}"`)
+    
+    // Ordenar por relevancia (nombre exacto primero, luego por apellido)
+    return pacientesEncontrados.sort((a, b) => {
+      const nombreCompletoA = `${a.nombre} ${a.apellido}`.toLowerCase()
+      const nombreCompletoB = `${b.nombre} ${b.apellido}`.toLowerCase()
+      
+      // Priorizar coincidencias exactas
+      if (nombreCompletoA === terminoLimpio) return -1
+      if (nombreCompletoB === terminoLimpio) return 1
+      
+      // Luego por orden alfabético
+      return nombreCompletoA.localeCompare(nombreCompletoB)
+    })
+    
+  } catch (error) {
+    console.error("Error al buscar pacientes:", error)
+    return []
+  }
+}
+
+// ===== FUNCIONES PARA COLA DE ESPERA =====
+
+// Obtener la fecha actual en formato YYYY-MM-DD
+function getFechaHoy(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+// Obtener la cola de espera del día actual
+export async function getColaEsperaDia(fecha?: string): Promise<PacienteEspera[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    const fechaBusqueda = fecha || getFechaHoy()
+    console.log(`🔍 Obteniendo cola de espera para el día: ${fechaBusqueda}`)
+    
+    const colaRef = collection(firestore, "cola-espera")
+    
+    // Simplificar la consulta para evitar el error del índice compuesto
+    // Solo filtrar por fechaCola y ordenar en memoria
+    const q = query(
+      colaRef,
+      where("fechaCola", "==", fechaBusqueda)
+    )
+    
+    const snapshot = await getDocs(q)
+    const pacientes = snapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        nombre: data.nombre,
+        turno: data.turno,
+        color: data.color,
+        estado: data.estado,
+        horaIngreso: data.horaIngreso?.toDate() || new Date(),
+        pacienteId: data.pacienteId,
+        rut: data.rut,
+        tieneFicha: data.tieneFicha,
+        fechaCola: data.fechaCola,
+        orden: data.orden || 0 // Agregar campo orden para mantener secuencia
+      } as PacienteEspera
+    })
+    
+    // Ordenar en memoria por orden y luego por hora de ingreso
+    pacientes.sort((a, b) => {
+      if (a.orden !== b.orden) {
+        return (a.orden || 0) - (b.orden || 0)
+      }
+      return a.horaIngreso.getTime() - b.horaIngreso.getTime()
+    })
+    
+    console.log(`📋 Encontrados ${pacientes.length} pacientes en cola para ${fechaBusqueda}`)
+    return pacientes
+    
+  } catch (error) {
+    console.error("Error al obtener cola de espera:", error)
+    return []
+  }
+}
+
+// Agregar paciente a la cola de espera
+export async function agregarPacienteACola(paciente: Omit<PacienteEspera, 'id' | 'fechaCola'>): Promise<string | null> {
+  const firestore = getDb()
+  if (!firestore) return null
+
+  try {
+    const fechaHoy = getFechaHoy()
+    
+    // Obtener el siguiente número de orden para este día
+    const colaRef = collection(firestore, "cola-espera")
+    const q = query(colaRef, where("fechaCola", "==", fechaHoy))
+    const snapshot = await getDocs(q)
+    const siguienteOrden = snapshot.docs.length
+    
+    const pacienteConFecha = {
+      ...paciente,
+      fechaCola: fechaHoy,
+      horaIngreso: serverTimestamp(),
+      orden: siguienteOrden // Agregar orden secuencial
+    }
+    
+    console.log(`➕ Agregando paciente a cola del día ${fechaHoy} (orden ${siguienteOrden}):`, paciente.nombre)
+    
+    const docRef = await addDoc(colaRef, pacienteConFecha)
+    
+    console.log(`✅ Paciente agregado con ID: ${docRef.id}`)
+    return docRef.id
+    
+  } catch (error) {
+    console.error("Error al agregar paciente a cola:", error)
+    return null
+  }
+}
+
+// Actualizar estado de paciente en cola
+export async function actualizarEstadoPacienteCola(id: string, nuevoEstado: 'esperando' | 'en-consulta' | 'atendido'): Promise<boolean> {
+  const firestore = getDb()
+  if (!firestore) return false
+
+  try {
+    console.log(`🔄 Actualizando estado de paciente ${id} a: ${nuevoEstado}`)
+    
+    const pacienteRef = doc(firestore, "cola-espera", id)
+    await updateDoc(pacienteRef, {
+      estado: nuevoEstado
+    })
+    
+    console.log(`✅ Estado actualizado correctamente`)
+    return true
+    
+  } catch (error) {
+    console.error("Error al actualizar estado del paciente:", error)
+    return false
+  }
+}
+
+// Eliminar paciente de la cola
+export async function eliminarPacienteDeCola(id: string): Promise<boolean> {
+  const firestore = getDb()
+  if (!firestore) return false
+
+  try {
+    console.log(`🗑️ Eliminando paciente de cola: ${id}`)
+    
+    const pacienteRef = doc(firestore, "cola-espera", id)
+    await deleteDoc(pacienteRef)
+    
+    console.log(`✅ Paciente eliminado de cola`)
+    return true
+    
+  } catch (error) {
+    console.error("Error al eliminar paciente de cola:", error)
+    return false
+  }
+}
+
+// Reordenar pacientes en cola (para drag & drop)
+export async function reordenarCola(pacientesOrdenados: PacienteEspera[]): Promise<boolean> {
+  const firestore = getDb()
+  if (!firestore) return false
+
+  try {
+    console.log(`🔄 Reordenando ${pacientesOrdenados.length} pacientes en cola`)
+    
+    // Actualizamos el campo orden para mantener la secuencia
+    const promises = pacientesOrdenados.map(async (paciente, index) => {
+      const pacienteRef = doc(firestore, "cola-espera", paciente.id)
+      
+      return updateDoc(pacienteRef, {
+        orden: index // Actualizar orden secuencial
+      })
+    })
+    
+    await Promise.all(promises)
+    console.log(`✅ Cola reordenada correctamente`)
+    return true
+    
+  } catch (error) {
+    console.error("Error al reordenar cola:", error)
+    return false
+  }
+}
+
+// Limpiar cola del día (eliminar todos los pacientes)
+export async function limpiarColaDia(fecha?: string): Promise<boolean> {
+  const firestore = getDb()
+  if (!firestore) return false
+
+  try {
+    const fechaLimpiar = fecha || getFechaHoy()
+    console.log(`🧹 Limpiando cola del día: ${fechaLimpiar}`)
+    
+    const colaRef = collection(firestore, "cola-espera")
+    const q = query(colaRef, where("fechaCola", "==", fechaLimpiar))
+    
+    const snapshot = await getDocs(q)
+    const promises = snapshot.docs.map(doc => deleteDoc(doc.ref))
+    
+    await Promise.all(promises)
+    console.log(`✅ Cola del día ${fechaLimpiar} limpiada (${snapshot.docs.length} pacientes eliminados)`)
+    return true
+    
+  } catch (error) {
+    console.error("Error al limpiar cola del día:", error)
+    return false
+  }
+}
+
+// Obtener estadísticas de la cola del día
+export async function getEstadisticasColaDia(fecha?: string): Promise<{
+  total: number
+  esperando: number
+  enConsulta: number
+  atendidos: number
+  conFicha: number
+  sinFicha: number
+}> {
+  try {
+    const pacientes = await getColaEsperaDia(fecha)
+    
+    return {
+      total: pacientes.length,
+      esperando: pacientes.filter(p => p.estado === 'esperando').length,
+      enConsulta: pacientes.filter(p => p.estado === 'en-consulta').length,
+      atendidos: pacientes.filter(p => p.estado === 'atendido').length,
+      conFicha: pacientes.filter(p => p.tieneFicha).length,
+      sinFicha: pacientes.filter(p => !p.tieneFicha).length,
+    }
+    
+  } catch (error) {
+    console.error("Error al obtener estadísticas de cola:", error)
+    return {
+      total: 0,
+      esperando: 0,
+      enConsulta: 0,
+      atendidos: 0,
+      conFicha: 0,
+      sinFicha: 0,
     }
   }
 }
