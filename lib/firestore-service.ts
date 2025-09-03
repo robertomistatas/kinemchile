@@ -1702,3 +1702,40 @@ export async function getEstadisticasColaDia(fecha?: string): Promise<{
     }
   }
 }
+
+// Limpiar colas de días anteriores (mantener solo el día actual)
+export async function limpiarColasAnteriores(): Promise<boolean> {
+  const firestore = getDb()
+  if (!firestore) return false
+
+  try {
+    const fechaHoy = getFechaHoy()
+    console.log(`🧹 Limpiando colas anteriores al día actual: ${fechaHoy}`)
+    
+    const colaRef = collection(firestore, "cola-espera")
+    const snapshot = await getDocs(colaRef)
+    
+    // Filtrar documentos que NO sean del día actual
+    const colasPorEliminar = snapshot.docs.filter(doc => {
+      const data = doc.data()
+      return data.fechaCola && data.fechaCola !== fechaHoy
+    })
+    
+    if (colasPorEliminar.length === 0) {
+      console.log(`✅ No hay colas anteriores para limpiar`)
+      return true
+    }
+    
+    console.log(`🗑️ Eliminando ${colasPorEliminar.length} registros de días anteriores`)
+    
+    const promises = colasPorEliminar.map(doc => deleteDoc(doc.ref))
+    await Promise.all(promises)
+    
+    console.log(`✅ Colas anteriores limpiadas correctamente`)
+    return true
+    
+  } catch (error) {
+    console.error("Error al limpiar colas anteriores:", error)
+    return false
+  }
+}

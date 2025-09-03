@@ -142,7 +142,9 @@ function PacienteItem({ paciente, onCambiarEstado, onEliminar, onVerFicha }: {
     <div
       ref={setNodeRef}
       style={style}
-      className="p-4 border rounded-lg shadow-sm bg-white hover:shadow-md transition-shadow"
+      className={`p-4 border rounded-lg shadow-sm bg-white hover:shadow-md transition-shadow ${
+        paciente.estado === 'atendido' ? 'opacity-75 bg-green-50' : ''
+      }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -173,6 +175,12 @@ function PacienteItem({ paciente, onCambiarEstado, onEliminar, onVerFicha }: {
                 </button>
               ) : (
                 <h3 className="font-medium text-gray-900">{paciente.nombre}</h3>
+              )}
+              
+              {paciente.estado === 'atendido' && (
+                <Badge variant="default" className="text-xs bg-green-600 text-white">
+                  ✓ Completado
+                </Badge>
               )}
               
               {paciente.tieneFicha && (
@@ -208,14 +216,25 @@ function PacienteItem({ paciente, onCambiarEstado, onEliminar, onVerFicha }: {
             {estadoInfo.boton}
           </Button>
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onEliminar(paciente.id)}
-            className="text-red-600 border-red-300 hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {/* Solo mostrar botón de eliminar para pacientes que NO están atendidos */}
+          {paciente.estado !== 'atendido' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEliminar(paciente.id)}
+              className="text-red-600 border-red-300 hover:bg-red-50"
+              title={`Eliminar "${paciente.nombre}" de la cola`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+          
+          {/* Mensaje informativo para pacientes atendidos */}
+          {paciente.estado === 'atendido' && (
+            <span className="text-xs text-green-600 font-medium px-2">
+              Permanece hasta el final del día
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -486,7 +505,25 @@ export default function ColaEsperaPage() {
   // Eliminar paciente
   const eliminarPaciente = async (id: string) => {
     try {
-      console.log(`🗑️ Eliminando paciente: ${id}`)
+      const paciente = pacientesEspera.find(p => p.id === id)
+      if (!paciente) return
+
+      // Verificar que no sea un paciente atendido
+      if (paciente.estado === 'atendido') {
+        alert('No se puede eliminar un paciente que ya fue atendido. Los pacientes atendidos permanecen en la cola durante todo el día.')
+        return
+      }
+
+      // Confirmación específica según el estado
+      const mensajeConfirmacion = paciente.estado === 'en-consulta' 
+        ? `¿Estás seguro de eliminar a "${paciente.nombre}" que está actualmente en consulta?`
+        : `¿Estás seguro de eliminar a "${paciente.nombre}" de la cola de espera?`
+
+      if (!confirm(mensajeConfirmacion)) {
+        return
+      }
+
+      console.log(`🗑️ Eliminando paciente: ${paciente.nombre} (Estado: ${paciente.estado})`)
       
       const success = await eliminarPacienteDeCola(id)
       if (success) {
