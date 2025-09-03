@@ -3,17 +3,21 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { getPacientesInactivos, getPacientesInactivosPorProfesional } from "@/lib/firestore"
 import type { Paciente } from "@/lib/data"
+import { Search, Filter, X } from "lucide-react"
 import Link from "next/link"
 
 export default function PacientesAltaPage() {
   const { user, userInfo, loading } = useAuth()
   const [pacientes, setPacientes] = useState<Paciente[]>([])
+  const [pacientesFiltrados, setPacientesFiltrados] = useState<Paciente[]>([])
   const [dataLoading, setDataLoading] = useState(false)
   const [verTodos, setVerTodos] = useState(false)
+  const [busqueda, setBusqueda] = useState("")
 
   const cargarPacientes = async (mostrarTodos = false) => {
     if (!user?.uid || !userInfo?.nombre) {
@@ -57,6 +61,7 @@ export default function PacientesAltaPage() {
       }
       
       setPacientes(data)
+      setPacientesFiltrados(data)
     } catch (error) {
       console.error("💥 [PACIENTES-ALTA] Error al cargar pacientes dados de alta:", error)
     } finally {
@@ -74,6 +79,47 @@ export default function PacientesAltaPage() {
     const nuevoVerTodos = !verTodos
     setVerTodos(nuevoVerTodos)
     cargarPacientes(nuevoVerTodos)
+  }
+
+  // Función para filtrar pacientes según la búsqueda
+  const filtrarPacientes = (textoBusqueda: string) => {
+    if (!textoBusqueda.trim()) {
+      setPacientesFiltrados(pacientes)
+      return
+    }
+
+    const busquedaLower = textoBusqueda.toLowerCase().trim()
+    const pacientesFiltrados = pacientes.filter(paciente => {
+      // Buscar por nombre completo
+      const nombreCompleto = `${paciente.nombre} ${paciente.apellido}`.toLowerCase()
+      if (nombreCompleto.includes(busquedaLower)) return true
+
+      // Buscar por nombre parcial
+      if (paciente.nombre.toLowerCase().includes(busquedaLower)) return true
+      if (paciente.apellido.toLowerCase().includes(busquedaLower)) return true
+
+      // Buscar por RUT (con o sin puntos y guión)
+      const rutLimpio = paciente.rut.replace(/[.-]/g, '').toLowerCase()
+      const busquedaRutLimpio = busquedaLower.replace(/[.-]/g, '')
+      if (rutLimpio.includes(busquedaRutLimpio)) return true
+
+      return false
+    })
+
+    setPacientesFiltrados(pacientesFiltrados)
+  }
+
+  // Efecto para filtrar cuando cambia la búsqueda o los pacientes
+  useEffect(() => {
+    filtrarPacientes(busqueda)
+  }, [busqueda, pacientes])
+
+  const handleBusquedaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setBusqueda(e.target.value)
+  }
+
+  const limpiarBusqueda = () => {
+    setBusqueda("")
   }
 
   if (loading || !user) return null
@@ -101,6 +147,37 @@ export default function PacientesAltaPage() {
           </div>
         </div>
 
+        {/* Buscador de pacientes dados de alta */}
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+          <CardContent className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-500" />
+              <Input
+                type="text"
+                placeholder="Buscar pacientes por nombre, apellido o RUT..."
+                value={busqueda}
+                onChange={handleBusquedaChange}
+                className="pl-10 pr-10 border-blue-300 focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-900"
+              />
+              {busqueda && (
+                <Button
+                  onClick={limpiarBusqueda}
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2 p-0 hover:bg-blue-100 dark:hover:bg-blue-900"
+                >
+                  <X className="h-4 w-4 text-blue-500" />
+                </Button>
+              )}
+            </div>
+            {busqueda && (
+              <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+                Mostrando {pacientesFiltrados.length} de {pacientes.length} pacientes
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
         {dataLoading ? (
           <Card>
             <CardContent className="flex items-center justify-center p-6">
@@ -109,22 +186,36 @@ export default function PacientesAltaPage() {
           </Card>
         ) : (
           <div className="grid gap-6 md:grid-cols-2">
-            {pacientes.length === 0 ? (
+            {pacientesFiltrados.length === 0 ? (
               <Card>
                 <CardHeader>
-                  <CardTitle>No hay pacientes dados de alta</CardTitle>
+                  <CardTitle>
+                    {busqueda ? "No se encontraron pacientes" : "No hay pacientes dados de alta"}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-muted-foreground">
-                    {verTodos 
-                      ? "No hay pacientes dados de alta en el sistema." 
-                      : "No tienes pacientes dados de alta asignados."
+                    {busqueda 
+                      ? `No se encontraron pacientes que coincidan con "${busqueda}"` 
+                      : verTodos 
+                        ? "No hay pacientes dados de alta en el sistema." 
+                        : "No tienes pacientes dados de alta asignados."
                     }
                   </p>
+                  {busqueda && (
+                    <Button 
+                      onClick={limpiarBusqueda} 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-2"
+                    >
+                      Limpiar búsqueda
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
-              pacientes.map((paciente) => (
+              pacientesFiltrados.map((paciente) => (
                 <Card key={paciente.id}>
                   <CardHeader>
                     <CardTitle>{paciente.nombre} {paciente.apellido}</CardTitle>
