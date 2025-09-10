@@ -185,9 +185,9 @@ export default function PacientesAltaPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-8 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
             {pacientesFiltrados.length === 0 ? (
-              <Card>
+              <Card className="col-span-full">
                 <CardHeader>
                   <CardTitle>
                     {busqueda ? "No se encontraron pacientes" : "No hay pacientes dados de alta"}
@@ -216,34 +216,77 @@ export default function PacientesAltaPage() {
               </Card>
             ) : (
               pacientesFiltrados.map((paciente) => (
-                <Card key={paciente.id}>
-                  <CardHeader>
-                    <CardTitle>{paciente.nombre} {paciente.apellido}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p><strong>RUT:</strong> {paciente.rut}</p>
-                    <p><strong>Teléfono:</strong> {paciente.telefono}</p>
-                    <p><strong>Email:</strong> {paciente.email}</p>
-                    <p><strong>Fecha de alta:</strong> {paciente.fechaAlta ? new Date(paciente.fechaAlta).toLocaleDateString() : "-"}</p>
-                    
-                    {/* Mostrar información del profesional */}
-                    {paciente.profesional_alta_nombre && (
-                      <p><strong>Dado de alta por:</strong> {paciente.profesional_alta_nombre}</p>
+                <Card key={paciente.id} className="overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50">
+                  <CardContent className="p-6">
+                    {/* Header con nombre y estado */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                          {paciente.nombre.toUpperCase()} {paciente.apellido.toUpperCase()}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="h-2 w-2 rounded-full bg-red-400"></div>
+                          <span className="text-sm font-medium text-red-600 dark:text-red-400">Dado de Alta</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Información principal en dos columnas */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">RUT</span>
+                        </div>
+                        <p className="text-gray-900 dark:text-gray-100 font-medium">{paciente.rut}</p>
+                        
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Teléfono</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300">{paciente.telefono}</p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Email</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300 text-sm break-all">{paciente.email}</p>
+                        
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Fecha de alta</span>
+                        </div>
+                        <p className="text-gray-700 dark:text-gray-300">{paciente.fechaAlta ? new Date(paciente.fechaAlta).toLocaleDateString() : "-"}</p>
+                      </div>
+                    </div>
+
+                    {/* Información del profesional */}
+                    <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 mb-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Tratante</span>
+                      </div>
+                      <p className="text-blue-800 dark:text-blue-300 font-medium">
+                        {paciente.profesional_alta_nombre || 
+                         paciente.tratante_nombre || 
+                         paciente.kinesiologo_nombre || 
+                         "No especificado"}
+                      </p>
+                    </div>
+
+                    {/* Notas de alta */}
+                    {paciente.notasAlta && (
+                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 mb-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wide">Notas de alta</span>
+                        </div>
+                        <p className="text-amber-800 dark:text-amber-300 text-sm leading-relaxed">{paciente.notasAlta}</p>
+                      </div>
                     )}
-                    {paciente.tratante_nombre && !paciente.profesional_alta_nombre && (
-                      <p><strong>Tratante:</strong> {paciente.tratante_nombre}</p>
-                    )}
-                    {paciente.kinesiologo_nombre && !paciente.profesional_alta_nombre && !paciente.tratante_nombre && (
-                      <p><strong>Kinesiólogo:</strong> {paciente.kinesiologo_nombre}</p>
-                    )}
                     
-                    {paciente.notasAlta && <p><strong>Notas de alta:</strong> {paciente.notasAlta}</p>}
-                    
-                    <div className="flex gap-2 mt-4">
-                      <Button asChild variant="outline">
+                    {/* Botones de acción */}
+                    <div className="flex gap-3 pt-2">
+                      <Button asChild variant="outline" className="flex-1 bg-white hover:bg-gray-50 border-gray-300 text-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
                         <Link href={`/pacientes/${paciente.id}`}>Ver ficha</Link>
                       </Button>
-                      <Button asChild variant="secondary">
+                      <Button asChild variant="default" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-md">
                         <Link href={`/pacientes/${paciente.id}?reactivar=1`}>Quitar alta</Link>
                       </Button>
                     </div>
