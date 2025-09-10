@@ -475,14 +475,15 @@ export default function ColaEsperaPage() {
       color: getRandomColor(),
       estado: 'esperando' as const,
       horaIngreso: new Date(),
-      pacienteId: pacienteData.id,
-      rut: pacienteData.rut,
+      // Solo agregar pacienteId y rut si existen (para pacientes con ficha)
+      ...(pacienteData.id && { pacienteId: pacienteData.id }),
+      ...(pacienteData.rut && { rut: pacienteData.rut }),
       tieneFicha: pacienteData.tieneFicha,
       fechaCola: getFechaHoy()
     }
 
     try {
-      console.log(`➕ Agregando paciente desde buscador: ${pacienteData.nombre}`)
+      console.log(`➕ Agregando paciente desde buscador: ${pacienteData.nombre} (${pacienteData.tieneFicha ? 'con ficha' : 'sin ficha'})`)
       
       // Agregar inmediatamente al estado local para feedback instantáneo
       const idTemporal = `temp_${Date.now()}`
@@ -506,6 +507,8 @@ export default function ColaEsperaPage() {
       }
     } catch (error) {
       console.error('❌ Error al agregar paciente desde buscador:', error)
+      console.error('❌ Detalles del error:', error)
+      console.error('❌ Datos del paciente que falló:', pacienteData)
       // Remover cualquier paciente temporal en caso de error
       setPacientesEspera(prev => prev.filter(p => !p.id.startsWith('temp_')))
       alert('Error al agregar paciente. Verifica tu conexión e inténtalo de nuevo.')

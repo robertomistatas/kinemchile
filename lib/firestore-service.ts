@@ -1544,7 +1544,10 @@ export async function getColaEsperaDia(fecha?: string): Promise<PacienteEspera[]
 // Agregar paciente a la cola de espera
 export async function agregarPacienteACola(paciente: Omit<PacienteEspera, 'id' | 'fechaCola'>): Promise<string | null> {
   const firestore = getDb()
-  if (!firestore) return null
+  if (!firestore) {
+    console.error("❌ Firestore no está inicializado")
+    return null
+  }
 
   try {
     const fechaHoy = getFechaHoy()
@@ -1562,7 +1565,12 @@ export async function agregarPacienteACola(paciente: Omit<PacienteEspera, 'id' |
       orden: siguienteOrden // Agregar orden secuencial
     }
     
-    console.log(`➕ Agregando paciente a cola del día ${fechaHoy} (orden ${siguienteOrden}):`, paciente.nombre)
+    console.log(`➕ Agregando paciente a cola del día ${fechaHoy} (orden ${siguienteOrden}):`)
+    console.log(`   Nombre: ${paciente.nombre}`)
+    console.log(`   Tiene ficha: ${paciente.tieneFicha}`)
+    console.log(`   PacienteId: ${paciente.pacienteId || 'N/A'}`)
+    console.log(`   RUT: ${paciente.rut || 'N/A'}`)
+    console.log(`   Datos completos:`, pacienteConFecha)
     
     const docRef = await addDoc(colaRef, pacienteConFecha)
     
@@ -1570,7 +1578,8 @@ export async function agregarPacienteACola(paciente: Omit<PacienteEspera, 'id' |
     return docRef.id
     
   } catch (error) {
-    console.error("Error al agregar paciente a cola:", error)
+    console.error("❌ Error al agregar paciente a cola:", error)
+    console.error("❌ Datos del paciente que falló:", paciente)
     return null
   }
 }
