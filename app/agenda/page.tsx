@@ -270,16 +270,43 @@ export default function ColaEsperaPage() {
   }
 
   // Función para cargar datos de la cola desde Firestore
-  const cargarColaDia = async () => {
+  const cargarColaDia = async (forzarActualizacion = false) => {
     try {
       setLoading(true)
       console.log('🔄 Cargando cola del día desde Firestore...')
       
       const pacientes = await getColaEsperaDia()
-      setPacientesEspera(pacientes)
+      
+      // Si no es una actualización forzada y hay pacientes en estado local,
+      // hacer una comparación inteligente para no perder datos
+      if (!forzarActualizacion && pacientesEspera.length > 0) {
+        console.log('🔍 Comparando con estado local para evitar pérdida de datos...')
+        
+        // Crear un mapa de pacientes de Firestore por ID
+        const pacientesFirestoreMap = new Map(pacientes.map(p => [p.id, p]))
+        
+        // Mantener pacientes locales que existen en Firestore + nuevos de Firestore
+        const pacientesActualizados = [...pacientes]
+        
+        // Verificar si hay pacientes locales que no están en Firestore (recién agregados)
+        const pacientesLocalesNuevos = pacientesEspera.filter(local => 
+          local.id && !pacientesFirestoreMap.has(local.id)
+        )
+        
+        if (pacientesLocalesNuevos.length > 0) {
+          console.log(`⚠️ Encontrados ${pacientesLocalesNuevos.length} pacientes locales no sincronizados`)
+          // Mantener estos pacientes en el estado
+          pacientesActualizados.push(...pacientesLocalesNuevos)
+        }
+        
+        setPacientesEspera(pacientesActualizados)
+      } else {
+        setPacientesEspera(pacientes)
+      }
+      
       setLastSync(new Date())
       
-      console.log(`✅ Cola cargada: ${pacientes.length} pacientes`)
+      console.log(`✅ Cola cargada: ${pacientes.length} pacientes desde Firestore`)
     } catch (error) {
       console.error('❌ Error al cargar cola:', error)
     } finally {
@@ -289,7 +316,7 @@ export default function ColaEsperaPage() {
 
   // Cargar datos al montar el componente
   useEffect(() => {
-    cargarColaDia()
+    cargarColaDia(true) // Forzar carga inicial
     
     // Cargar configuración desde localStorage
     const savedConfig = localStorage.getItem('cola-espera-config')
@@ -302,23 +329,23 @@ export default function ColaEsperaPage() {
       }
     }
 
-    // Configurar actualización periódica cada 30 segundos
+    // Configurar actualización periódica cada 30 segundos (sin forzar)
     const interval = setInterval(() => {
       console.log('🔄 Actualizando cola automáticamente...')
-      cargarColaDia()
+      cargarColaDia(false) // NO forzar para preservar estado local
     }, 30000)
 
-    // Listener para cuando la ventana recupera el foco
+    // Listener para cuando la ventana recupera el foco (forzar actualización)
     const handleFocus = () => {
       console.log('🔄 Ventana recuperó el foco, actualizando cola...')
-      cargarColaDia()
+      cargarColaDia(true) // Forzar actualización cuando se regresa a la ventana
     }
 
     // Listener para cambios de visibilidad de la página
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         console.log('🔄 Página visible, actualizando cola...')
-        cargarColaDia()
+        cargarColaDia(true) // Forzar actualización cuando la página se vuelve visible
       }
     }
 
@@ -400,20 +427,34 @@ export default function ColaEsperaPage() {
 
     try {
       console.log('➕ Agregando paciente manual a Firestore...')
+      
+      // Agregar inmediatamente al estado local para feedback instantáneo
+      const idTemporal = `temp_${Date.now()}`
+      const pacienteTemporal = { ...nuevoPaciente, id: idTemporal }
+      setPacientesEspera(prev => [...prev, pacienteTemporal])
+      
+      // Intentar guardar en Firestore
       const id = await agregarPacienteACola(nuevoPaciente)
       
       if (id) {
-        // Agregar al estado local con el ID de Firestore
-        const pacienteConId = { ...nuevoPaciente, id }
-        setPacientesEspera(prev => [...prev, pacienteConId])
+        // Reemplazar el temporal con el real
+        setPacientesEspera(prev => 
+          prev.map(p => p.id === idTemporal ? { ...nuevoPaciente, id } : p)
+        )
         setNuevoFormData({ nombre: '', turno: '' })
         setIsDialogOpen(false)
-        console.log('✅ Paciente agregado correctamente')
+        console.log('✅ Paciente agregado correctamente con ID:', id)
       } else {
-        console.error('❌ Error al agregar paciente')
+        // Remover el temporal si falló
+        setPacientesEspera(prev => prev.filter(p => p.id !== idTemporal))
+        console.error('❌ Error al agregar paciente a Firestore')
+        alert('Error al agregar paciente. Inténtalo de nuevo.')
       }
     } catch (error) {
       console.error('❌ Error al agregar paciente:', error)
+      // Remover cualquier paciente temporal en caso de error
+      setPacientesEspera(prev => prev.filter(p => !p.id.startsWith('temp_')))
+      alert('Error al agregar paciente. Verifica tu conexión e inténtalo de nuevo.')
     }
   }
 
@@ -442,18 +483,32 @@ export default function ColaEsperaPage() {
 
     try {
       console.log(`➕ Agregando paciente desde buscador: ${pacienteData.nombre}`)
+      
+      // Agregar inmediatamente al estado local para feedback instantáneo
+      const idTemporal = `temp_${Date.now()}`
+      const pacienteTemporal = { ...nuevoPaciente, id: idTemporal }
+      setPacientesEspera(prev => [...prev, pacienteTemporal])
+      
+      // Intentar guardar en Firestore
       const id = await agregarPacienteACola(nuevoPaciente)
       
       if (id) {
-        // Agregar al estado local con el ID de Firestore
-        const pacienteConId = { ...nuevoPaciente, id }
-        setPacientesEspera(prev => [...prev, pacienteConId])
-        console.log(`✅ Paciente agregado a la cola: ${pacienteData.nombre} (${pacienteData.tieneFicha ? 'Con ficha' : 'Sin ficha'})`)
+        // Reemplazar el temporal con el real
+        setPacientesEspera(prev => 
+          prev.map(p => p.id === idTemporal ? { ...nuevoPaciente, id } : p)
+        )
+        console.log(`✅ Paciente ${pacienteData.nombre} agregado correctamente con ID:`, id)
       } else {
+        // Remover el temporal si falló
+        setPacientesEspera(prev => prev.filter(p => p.id !== idTemporal))
         console.error('❌ Error al agregar paciente desde buscador')
+        alert('Error al agregar paciente. Inténtalo de nuevo.')
       }
     } catch (error) {
       console.error('❌ Error al agregar paciente desde buscador:', error)
+      // Remover cualquier paciente temporal en caso de error
+      setPacientesEspera(prev => prev.filter(p => !p.id.startsWith('temp_')))
+      alert('Error al agregar paciente. Verifica tu conexión e inténtalo de nuevo.')
     }
   }
 
@@ -781,7 +836,7 @@ export default function ColaEsperaPage() {
 
             <Button 
               variant="outline" 
-              onClick={cargarColaDia}
+              onClick={() => cargarColaDia(true)}
               className="text-green-600 border-green-200 hover:bg-green-50"
               title="Recargar cola desde Firestore"
             >
