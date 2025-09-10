@@ -38,13 +38,13 @@ export function RealTimeClock() {
   }
 
   return (
-    <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-muted/50 rounded-lg border border-border/50">
-      <Clock className="h-4 w-4 text-primary" />
+    <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-muted/40 rounded-lg border border-border/40 backdrop-blur-sm">
+      <Clock className="h-4 w-4 text-primary/80" />
       <div className="flex flex-col text-xs leading-tight">
-        <span className="font-medium text-foreground">
+        <span className="font-medium text-foreground/90">
           {formatDate(time)}
         </span>
-        <span className="font-mono text-muted-foreground">
+        <span className="font-mono text-muted-foreground/80 text-[11px]">
           {formatTime(time)}
         </span>
       </div>

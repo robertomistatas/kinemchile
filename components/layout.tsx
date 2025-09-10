@@ -56,7 +56,7 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 border-b bg-background no-print w-full">
+      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 no-print w-full">
         <div className="container max-w-full px-2 sm:px-4 flex h-16 items-center justify-between py-2 gap-2 md:gap-0">
           <div className="flex items-center gap-2 min-w-0">
             <Sheet>
@@ -103,52 +103,65 @@ export function Layout({ children }: LayoutProps) {
               />
             </Link>
           </div>
-          <nav className="hidden md:flex gap-4 items-center flex-shrink-0">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`font-medium whitespace-nowrap ${
-                  pathname === item.href ? "text-primary" : "text-foreground hover:text-primary"
-                }`}
-              >
-                {item.name}
-              </Link>
-            ))}
-            <ThemeToggle />
-            <RealTimeClock />
+          
+          {/* Navegación centrada con estilo de tabs */}
+          <nav className="hidden md:flex items-center justify-center flex-1 px-4">
+            <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-xl border border-border/50 backdrop-blur-sm">
+              {navigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out whitespace-nowrap ${
+                    pathname === item.href
+                      ? "text-primary-foreground bg-primary shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background/80"
+                  }`}
+                >
+                  {item.name}
+                  {pathname === item.href && (
+                    <div className="absolute inset-0 bg-primary rounded-lg shadow-sm -z-10 animate-in fade-in-0 zoom-in-95 duration-200" />
+                  )}
+                </Link>
+              ))}
+            </div>
           </nav>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/images/avatar.png" alt={user?.email || "Usuario"} />
-                    <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none truncate max-w-[150px]">{user?.email || "Usuario"}</p>
-                    <p className="text-xs leading-none text-muted-foreground truncate max-w-[150px]">{user?.email || "usuario@ejemplo.com"}</p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/perfil" className="flex items-center gap-2 cursor-pointer">
-                    <User className="h-4 w-4" />
-                    <span>Perfil</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => logout()}>
-                  <LogOut className="h-4 w-4" />
-                  <span>Cerrar sesión</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+
+          {/* Reloj y controles del usuario */}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <RealTimeClock />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src="/images/avatar.png" alt={user?.email || "Usuario"} />
+                      <AvatarFallback>{user?.email?.charAt(0).toUpperCase() || "U"}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none truncate max-w-[150px]">{user?.email || "Usuario"}</p>
+                      <p className="text-xs leading-none text-muted-foreground truncate max-w-[150px]">{user?.email || "usuario@ejemplo.com"}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/perfil" className="flex items-center gap-2 cursor-pointer">
+                      <User className="h-4 w-4" />
+                      <span>Perfil</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => logout()}>
+                    <LogOut className="h-4 w-4" />
+                    <span>Cerrar sesión</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </header>
