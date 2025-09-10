@@ -56,8 +56,6 @@ import {
   X,
   RotateCcw,
   Settings,
-  Download,
-  Upload,
   Save,
   FileText,
   UserX,
@@ -622,53 +620,6 @@ export default function ColaEsperaPage() {
     }
   }
 
-  // Exportar cola a archivo JSON
-  const exportarCola = () => {
-    const data = {
-      pacientes: pacientesEspera,
-      fecha: new Date().toISOString(),
-      configuracion
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `cola-espera-${new Date().toISOString().split('T')[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
-  // Importar cola desde archivo JSON
-  const importarCola = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string)
-        if (data.pacientes && Array.isArray(data.pacientes)) {
-          const pacientes = data.pacientes.map((p: any) => ({
-            ...p,
-            horaIngreso: new Date(p.horaIngreso)
-          }))
-          setPacientesEspera(pacientes)
-          
-          if (data.configuracion) {
-            setConfiguracion(data.configuracion)
-          }
-        }
-      } catch (error) {
-        console.error('Error al importar cola:', error)
-        alert('Error al importar el archivo. Verifica que sea un archivo válido.')
-      }
-    }
-    reader.readAsText(file)
-    event.target.value = '' // Reset input
-  }
-
   // Estadísticas de la cola
   const stats = {
     total: pacientesEspera.length,
@@ -685,7 +636,7 @@ export default function ColaEsperaPage() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Cola de Espera - Firestore</h1>
+            <h1 className="text-3xl font-bold">Lista de espera de Pacientes</h1>
             <div className="flex items-center gap-2 text-gray-600 mt-1">
               <Calendar className="h-4 w-4" />
               <p>Sistema multi-computador - {new Date().toLocaleDateString('es-CL', { 
@@ -858,59 +809,10 @@ export default function ColaEsperaPage() {
               Resetear Cola del Día
             </Button>
 
-            {/* Botón de debug temporal */}
-            <Button 
-              variant="outline" 
-              onClick={async () => {
-                console.log('🔍 DEBUG - Estado actual pacientesEspera:', pacientesEspera)
-                
-                try {
-                  const pacientesFirestore = await getColaEsperaDia()
-                  console.log('🔍 DEBUG - Datos en Firestore:', pacientesFirestore)
-                  
-                  const estadisticas = await getEstadisticasColaDia()
-                  console.log('🔍 DEBUG - Estadísticas:', estadisticas)
-                  
-                  alert(`Debug info (ver consola):\nEstado local: ${pacientesEspera.length} pacientes\nFirestore: ${pacientesFirestore.length} pacientes\nÚltima carga: ${loading ? 'Cargando...' : 'Completada'}`)
-                } catch (error) {
-                  console.error('🔍 DEBUG - Error:', error)
-                  alert('Error al obtener debug info: ' + error)
-                }
-              }}
-              className="text-purple-600 border-purple-200 hover:bg-purple-50"
-            >
-              🐛 Debug Firestore
-            </Button>
-
             <ConfiguracionCola 
               configuracion={configuracion}
               onActualizar={setConfiguracion}
             />
-
-            <Button 
-              variant="outline" 
-              onClick={exportarCola}
-              disabled={stats.total === 0}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar
-            </Button>
-
-            <div className="relative">
-              <input
-                type="file"
-                accept=".json"
-                onChange={importarCola}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                id="importar-cola"
-              />
-              <Button variant="outline" asChild>
-                <label htmlFor="importar-cola" className="cursor-pointer">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar
-                </label>
-              </Button>
-            </div>
           </div>
         )}
 

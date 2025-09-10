@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu, User, Home, Users, Calendar, LogOut, Heart, LayoutDashboard, Settings } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
 import { ThemeToggle } from "@/components/ui/theme-toggle"
+import { RealTimeClock } from "@/components/real-time-clock"
 
 interface LayoutProps {
   children: React.ReactNode
@@ -115,6 +116,7 @@ export function Layout({ children }: LayoutProps) {
               </Link>
             ))}
             <ThemeToggle />
+            <RealTimeClock />
           </nav>
           <div className="flex items-center gap-2 flex-shrink-0">
             <DropdownMenu>
