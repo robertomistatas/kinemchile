@@ -15,7 +15,7 @@ import {
   serverTimestamp,
   deleteField,
 } from "@/lib/firebase"
-import type { Paciente, Sesion, Cita, Usuario, PacienteEspera } from "./data"
+import type { Paciente, Sesion, Cita, Usuario, PacienteEspera, NotaMedica } from "./data"
 
 // Función para obtener la instancia de Firestore
 function getDb() {
@@ -347,6 +347,21 @@ export async function eliminarPaciente(id: string) {
   if (!firestore) throw new Error("Firestore no está inicializado")
 
   try {
+    // Verificar que el usuario autenticado sea roberto@mistatas.com
+    const { auth } = initFirebase()
+    if (!auth || !auth.currentUser) {
+      console.warn("⚠️ Intento de eliminación bloqueado: no hay usuario autenticado.")
+      throw new Error("No hay usuario autenticado")
+    }
+
+    if (auth.currentUser.email !== "roberto@mistatas.com") {
+      console.warn("⚠️ Intento de eliminación bloqueado: usuario no autorizado.", {
+        usuario: auth.currentUser.email,
+        pacienteId: id
+      })
+      throw new Error("No tienes permisos para eliminar pacientes")
+    }
+
     console.log(`Eliminando paciente con ID: ${id}`)
     const docRef = doc(firestore, "pacientes", id)
     await deleteDoc(docRef)
@@ -1746,5 +1761,97 @@ export async function limpiarColasAnteriores(): Promise<boolean> {
   } catch (error) {
     console.error("Error al limpiar colas anteriores:", error)
     return false
+  }
+}
+
+// ===== FUNCIONES PARA NOTAS MÉDICAS =====
+
+// Obtener todas las notas médicas de un paciente
+export async function getNotasMedicas(pacienteId: string): Promise<NotaMedica[]> {
+  const firestore = getDb()
+  if (!firestore) return []
+
+  try {
+    console.log(`📋 Obteniendo notas médicas del paciente: ${pacienteId}`)
+    
+    const notasRef = collection(firestore, `pacientes/${pacienteId}/notasMedicas`)
+    const q = query(notasRef, orderBy("fecha", "desc"))
+    const snapshot = await getDocs(q)
+    
+    const notas = snapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        pacienteId: data.pacienteId,
+        medicoId: data.medicoId,
+        medicoNombre: data.medicoNombre,
+        fecha: data.fecha,
+        contenido: data.contenido,
+        actualizadoEn: data.actualizadoEn
+      } as NotaMedica
+    })
+    
+    console.log(`✅ Encontradas ${notas.length} notas médicas`)
+    return notas
+    
+  } catch (error) {
+    console.error("❌ Error al obtener notas médicas:", error)
+    return []
+  }
+}
+
+// Crear una nueva nota médica
+export async function crearNotaMedica(
+  pacienteId: string, 
+  nota: Omit<NotaMedica, "id" | "fecha" | "actualizadoEn">
+): Promise<string> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`➕ Creando nueva nota médica para paciente: ${pacienteId}`)
+    
+    const notasRef = collection(firestore, `pacientes/${pacienteId}/notasMedicas`)
+    
+    const notaData = {
+      ...nota,
+      fecha: Date.now()
+    }
+    
+    const docRef = await addDoc(notasRef, notaData)
+    console.log(`✅ Nota médica creada con ID: ${docRef.id}`)
+    
+    return docRef.id
+    
+  } catch (error) {
+    console.error("❌ Error al crear nota médica:", error)
+    throw error
+  }
+}
+
+// Actualizar una nota médica existente
+export async function actualizarNotaMedica(
+  pacienteId: string, 
+  notaId: string, 
+  contenido: string
+): Promise<void> {
+  const firestore = getDb()
+  if (!firestore) throw new Error("Firestore no está inicializado")
+
+  try {
+    console.log(`🔄 Actualizando nota médica ${notaId} del paciente ${pacienteId}`)
+    
+    const notaRef = doc(firestore, `pacientes/${pacienteId}/notasMedicas`, notaId)
+    
+    await updateDoc(notaRef, {
+      contenido: contenido,
+      actualizadoEn: Date.now()
+    })
+    
+    console.log(`✅ Nota médica actualizada correctamente`)
+    
+  } catch (error) {
+    console.error("❌ Error al actualizar nota médica:", error)
+    throw error
   }
 }

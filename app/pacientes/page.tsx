@@ -23,6 +23,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+// Helper para capitalizar primera letra
+function capitalize(s: string) {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function PacientesPage() {
   const { user, loading, userInfo } = useAuth()
   const router = useRouter()
@@ -124,6 +130,12 @@ export default function PacientesPage() {
       return ordenAscendente ? comparacion : -comparacion
     })
 
+  // Generar mes y año actual dinámicamente
+  const ahora = new Date();
+  const mesAnio = capitalize(
+    ahora.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' })
+  );
+
   const handleEliminarPaciente = (id: string) => {
     setPacienteAEliminar(id)
   }
@@ -160,7 +172,9 @@ export default function PacientesPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Pacientes</h1>
-            <p className="text-sm text-muted-foreground">Mayo 2025 - Listado de pacientes</p>
+            <p className="text-sm text-muted-foreground">
+              {mesAnio} - Listado de pacientes
+            </p>
           </div>
           <div className="flex gap-2">
             {(userInfo?.rol === "kinesiologo" || userInfo?.rol === "profesional") && (
@@ -306,15 +320,17 @@ export default function PacientesPage() {
                             <span className="sr-only">Editar</span>
                           </Link>
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Eliminar paciente"
-                          onClick={() => paciente.id && handleEliminarPaciente(paciente.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Eliminar</span>
-                        </Button>
+                        {user?.email === "roberto@mistatas.com" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Eliminar paciente"
+                            onClick={() => paciente.id && handleEliminarPaciente(paciente.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Eliminar</span>
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

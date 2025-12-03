@@ -198,3 +198,14 @@ export interface PacienteEspera {
   fechaCola: string // Fecha en formato YYYY-MM-DD
   orden?: number // Orden en la cola para mantener secuencia
 }
+
+// Interface para notas médicas
+export interface NotaMedica {
+  id?: string
+  pacienteId: string
+  medicoId: string
+  medicoNombre: string
+  fecha: number // timestamp
+  contenido: string
+  actualizadoEn?: number
+}

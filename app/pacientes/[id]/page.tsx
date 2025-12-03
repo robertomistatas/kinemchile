@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Layout } from "@/components/layout"
 import { useAuth } from "@/context/auth-context"
 import { getPaciente, getSesionesPaciente, actualizarPaciente } from "@/lib/firestore"
-import type { Paciente, Sesion, Usuario } from "@/lib/data"
+import { getNotasMedicas, crearNotaMedica, actualizarNotaMedica } from "@/lib/firestore-service"
+import type { Paciente, Sesion, Usuario, NotaMedica } from "@/lib/data"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit, Save, X, Clock, Calendar, Stethoscope, FileText, Activity, AlertTriangle } from "lucide-react"
+import { AlertCircle, Printer, FileDown, ArrowLeft, CheckCircle, XCircle, RefreshCw, Edit, Save, X, Clock, Calendar, Stethoscope, FileText, Activity, AlertTriangle, Trash } from "lucide-react"
 import Link from "next/link"
 import {
   Dialog,
@@ -22,6 +23,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { jsPDF } from "jspdf"
 import "jspdf-autotable"
@@ -31,7 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 
 export default function PacienteDetallePage() {
-  const { user, loading } = useAuth()
+  const { user, loading, userInfo } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { id } = useParams() as { id: string }
@@ -44,6 +55,14 @@ export default function PacienteDetallePage() {
   const [notasAlta, setNotasAlta] = useState("")
   const [showAltaDialog, setShowAltaDialog] = useState(false)
   const [activeTab, setActiveTab] = useState("informacion")
+  
+  // Estados para notas médicas
+  const [notasMedicas, setNotasMedicas] = useState<NotaMedica[]>([])
+  const [showCrearNotaDialog, setShowCrearNotaDialog] = useState(false)
+  const [showEditarNotaDialog, setShowEditarNotaDialog] = useState(false)
+  const [notaActual, setNotaActual] = useState<NotaMedica | null>(null)
+  const [contenidoNota, setContenidoNota] = useState("")
+  const [savingNota, setSavingNota] = useState(false)
 
   // Detectar si viene desde la agenda
   const fromAgenda = searchParams?.get('from') === 'agenda'
@@ -52,6 +71,10 @@ export default function PacienteDetallePage() {
   const [editingSesionId, setEditingSesionId] = useState<string | null>(null)
   const [editingSesionData, setEditingSesionData] = useState<{ fecha: string; notas: string } | null>(null)
   const [savingSesion, setSavingSesion] = useState(false)
+  
+  // Estados para eliminación de sesiones
+  const [deletingSesionId, setDeletingSesionId] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
   // Función para obtener información de la última sesión
   const getUltimaVisitaInfo = () => {
@@ -133,6 +156,17 @@ export default function PacienteDetallePage() {
       } catch (sesionesError) {
         console.error("Error al cargar sesiones:", sesionesError)
         setError("Error al cargar las sesiones del paciente")
+      }
+
+      // Cargar notas médicas
+      console.log(`Cargando notas médicas para el paciente ${id}`)
+      try {
+        const notasData = await getNotasMedicas(id)
+        console.log(`Notas médicas cargadas: ${notasData.length}`)
+        setNotasMedicas(notasData)
+      } catch (notasError) {
+        console.error("Error al cargar notas médicas:", notasError)
+        // No mostramos error al usuario, solo log
       }
     } catch (error) {
       console.error("Error al cargar datos:", error)
@@ -217,6 +251,47 @@ export default function PacienteDetallePage() {
     }
   }
 
+  // Funciones para eliminar sesiones
+  const handleDeleteSesion = (sesionId: string) => {
+    setDeletingSesionId(sesionId)
+    setShowDeleteDialog(true)
+  }
+
+  const confirmarEliminarSesion = async () => {
+    if (!deletingSesionId) return
+
+    try {
+      // Importar función de eliminación
+      const { eliminarSesion } = await import("@/lib/firestore-service")
+      
+      await eliminarSesion(deletingSesionId)
+
+      // Actualizar estado local - eliminar de sesiones
+      setSesiones(prev => prev.filter(s => s.id !== deletingSesionId))
+      
+      // Actualizar estado local - eliminar de evaluaciones
+      setEvaluaciones(prev => prev.filter(e => e.id !== deletingSesionId))
+
+      // Limpiar estado
+      setDeletingSesionId(null)
+      setShowDeleteDialog(false)
+      
+      // Mostrar mensaje de éxito
+      setSuccess("Sesión eliminada correctamente")
+      setTimeout(() => setSuccess(""), 3000)
+      
+    } catch (error) {
+      console.error("Error al eliminar sesión:", error)
+      setError("Error al eliminar la sesión")
+      setShowDeleteDialog(false)
+    }
+  }
+
+  const cancelarEliminarSesion = () => {
+    setDeletingSesionId(null)
+    setShowDeleteDialog(false)
+  }
+
   // Funciones de ordenamiento
   const ordenarSesiones = (sesiones: Sesion[], orden: 'asc' | 'desc') => {
     return [...sesiones].sort((a, b) => {
@@ -233,6 +308,75 @@ export default function PacienteDetallePage() {
 
   const toggleOrdenEvaluaciones = () => {
     setOrdenEvaluaciones(prev => prev === 'asc' ? 'desc' : 'asc')
+  }
+
+  // Funciones para notas médicas
+  const handleCrearNota = () => {
+    setContenidoNota("")
+    setShowCrearNotaDialog(true)
+  }
+
+  const handleEditarNota = (nota: NotaMedica) => {
+    setNotaActual(nota)
+    setContenidoNota(nota.contenido)
+    setShowEditarNotaDialog(true)
+  }
+
+  const handleGuardarNuevaNota = async () => {
+    if (!contenidoNota.trim() || !userInfo) return
+
+    setSavingNota(true)
+    try {
+      await crearNotaMedica(id, {
+        pacienteId: id,
+        medicoId: userInfo.id!,
+        medicoNombre: userInfo.nombre,
+        contenido: contenidoNota.trim()
+      })
+
+      // Recargar notas
+      const notasActualizadas = await getNotasMedicas(id)
+      setNotasMedicas(notasActualizadas)
+
+      setShowCrearNotaDialog(false)
+      setContenidoNota("")
+      setSuccess("Nota médica creada correctamente")
+      setTimeout(() => setSuccess(""), 3000)
+    } catch (error) {
+      console.error("Error al crear nota médica:", error)
+      setError("Error al crear la nota médica")
+    } finally {
+      setSavingNota(false)
+    }
+  }
+
+  const handleActualizarNota = async () => {
+    if (!contenidoNota.trim() || !notaActual) return
+
+    setSavingNota(true)
+    try {
+      await actualizarNotaMedica(id, notaActual.id!, contenidoNota.trim())
+
+      // Recargar notas
+      const notasActualizadas = await getNotasMedicas(id)
+      setNotasMedicas(notasActualizadas)
+
+      setShowEditarNotaDialog(false)
+      setNotaActual(null)
+      setContenidoNota("")
+      setSuccess("Nota médica actualizada correctamente")
+      setTimeout(() => setSuccess(""), 3000)
+    } catch (error) {
+      console.error("Error al actualizar nota médica:", error)
+      setError("Error al actualizar la nota médica")
+    } finally {
+      setSavingNota(false)
+    }
+  }
+
+  const puedeCrearNotas = userInfo?.funcion === "medico"
+  const puedeEditarNota = (nota: NotaMedica) => {
+    return userInfo?.funcion === "medico" && userInfo?.id === nota.medicoId
   }
 
   const handleRefresh = () => {
@@ -618,6 +762,7 @@ export default function PacienteDetallePage() {
             <TabsTrigger value="clinica">Información Clínica</TabsTrigger>
             <TabsTrigger value="evaluaciones">Evaluaciones</TabsTrigger>
             <TabsTrigger value="sesiones">Historial de Sesiones</TabsTrigger>
+            <TabsTrigger value="notas-medicas">Notas Médicas</TabsTrigger>
           </TabsList>
 
           {/* Para impresión, mostrar todas las secciones */}
@@ -863,16 +1008,28 @@ export default function PacienteDetallePage() {
                                   >
                                     ❌ Cancelar
                                   </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDeleteSesion(sesion.id!)}
+                                    disabled={savingSesion}
+                                    className="bg-red-50 hover:bg-red-100 border-red-300 text-red-600"
+                                    title="Eliminar sesión"
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEditSesion(sesion)}
-                                  className="bg-blue-50 hover:bg-blue-100 border-blue-300"
-                                >
-                                  ✏️ Editar
-                                </Button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleEditSesion(sesion)}
+                                    className="bg-blue-50 hover:bg-blue-100 border-blue-300"
+                                  >
+                                    ✏️ Editar
+                                  </Button>
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>
@@ -983,15 +1140,27 @@ export default function PacienteDetallePage() {
                               >
                                 <X className="h-3 w-3" />
                               </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDeleteSesion(evaluacion.id!)}
+                                disabled={savingSesion}
+                                className="bg-red-50 hover:bg-red-100 border-red-300 text-red-600"
+                                title="Eliminar evaluación"
+                              >
+                                <Trash className="h-4 w-4" />
+                              </Button>
                             </div>
                           ) : (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditSesion(evaluacion)}
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEditSesion(evaluacion)}
+                              >
+                                <Edit className="h-3 w-3" />
+                              </Button>
+                            </div>
                           )}
                         </TableCell>
                       </TableRow>
@@ -1348,8 +1517,194 @@ export default function PacienteDetallePage() {
               </>
             )}
           </TabsContent>
+
+          {/* Tab de Notas Médicas */}
+          <TabsContent value="notas-medicas">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Notas Médicas</CardTitle>
+                  <CardDescription>
+                    Notas creadas por médicos tratantes del paciente
+                  </CardDescription>
+                </div>
+                {puedeCrearNotas && (
+                  <Button onClick={handleCrearNota} className="no-print">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Agregar Nota Médica
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {notasMedicas.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="mx-auto h-12 w-12 mb-2 opacity-50" />
+                    <p>No hay notas médicas registradas para este paciente</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {notasMedicas.map((nota) => (
+                      <Card key={nota.id} className="border-l-4 border-l-blue-500">
+                        <CardHeader>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-muted-foreground">
+                                {new Date(nota.fecha).toLocaleDateString("es-CL", {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit"
+                                })}
+                              </span>
+                            </div>
+                            {puedeEditarNota(nota) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditarNota(nota)}
+                                className="no-print"
+                              >
+                                <Edit className="mr-2 h-3 w-3" />
+                                Editar
+                              </Button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Stethoscope className="h-4 w-4 text-blue-600" />
+                            <span className="font-medium text-blue-600">{nota.medicoNombre}</span>
+                          </div>
+                          {nota.actualizadoEn && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Última actualización:{" "}
+                              {new Date(nota.actualizadoEn).toLocaleDateString("es-CL", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </p>
+                          )}
+                        </CardHeader>
+                        <CardContent>
+                          <div className="whitespace-pre-wrap text-sm">{nota.contenido}</div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+      
+      {/* Diálogo de confirmación para eliminar sesión */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Esto eliminará permanentemente la sesión seleccionada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelarEliminarSesion}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarEliminarSesion} className="bg-red-500 hover:bg-red-600">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo para crear nota médica */}
+      <Dialog open={showCrearNotaDialog} onOpenChange={setShowCrearNotaDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Crear Nueva Nota Médica</DialogTitle>
+            <DialogDescription>
+              Agrega una nota médica para el paciente {paciente?.nombre} {paciente?.apellido}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="contenido-nota">Contenido de la nota</Label>
+              <Textarea
+                id="contenido-nota"
+                value={contenidoNota}
+                onChange={(e) => setContenidoNota(e.target.value)}
+                placeholder="Escribe la nota médica aquí..."
+                rows={10}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCrearNotaDialog(false)
+                setContenidoNota("")
+              }}
+              disabled={savingNota}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleGuardarNuevaNota}
+              disabled={!contenidoNota.trim() || savingNota}
+            >
+              {savingNota ? "Guardando..." : "Guardar Nota"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo para editar nota médica */}
+      <Dialog open={showEditarNotaDialog} onOpenChange={setShowEditarNotaDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar Nota Médica</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas modificar esta nota?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="contenido-nota-edit">Contenido de la nota</Label>
+              <Textarea
+                id="contenido-nota-edit"
+                value={contenidoNota}
+                onChange={(e) => setContenidoNota(e.target.value)}
+                placeholder="Escribe la nota médica aquí..."
+                rows={10}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEditarNotaDialog(false)
+                setNotaActual(null)
+                setContenidoNota("")
+              }}
+              disabled={savingNota}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleActualizarNota}
+              disabled={!contenidoNota.trim() || savingNota}
+            >
+              {savingNota ? "Guardando..." : "Guardar Cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   )
 }
