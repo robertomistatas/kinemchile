@@ -1224,6 +1224,14 @@ export default function PacienteDetallePage() {
                 <CardHeader>
                   <CardTitle>Información Personal</CardTitle>
                   <CardDescription>Datos personales del paciente</CardDescription>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="inline-flex items-center rounded-full bg-slate-700 px-4 py-2 text-sm font-medium text-white">
+                      Fecha de ingreso: {paciente.fechaIngreso || "No registrada"}
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white">
+                      Profesional Tratante: {paciente.tratante_nombre || "Sin asignar"}
+                    </span>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">

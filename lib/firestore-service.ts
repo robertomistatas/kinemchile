@@ -166,6 +166,9 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         updatedAt: data.updatedAt || null,
         kinesiologo_id: data.kinesiologo_id || null,
         kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || undefined,
+        tratante_nombre: data.tratante_nombre || undefined,
+        tratante_funcion: data.tratante_funcion || undefined,
         fechaIngreso: data.fechaIngreso || "",
       }
 
@@ -215,6 +218,10 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
           updatedAt: data.updatedAt || null,
           kinesiologo_id: data.kinesiologo_id || null,
           kinesiologo_nombre: data.kinesiologo_nombre || null,
+          tratante_id: data.tratante_id || undefined,
+          tratante_nombre: data.tratante_nombre || undefined,
+          tratante_funcion: data.tratante_funcion || undefined,
+          fechaIngreso: data.fechaIngreso || "",
         }
       }
     }
@@ -257,6 +264,10 @@ export async function getPaciente(id: string): Promise<Paciente | null> {
         updatedAt: data.updatedAt || null,
         kinesiologo_id: data.kinesiologo_id || null,
         kinesiologo_nombre: data.kinesiologo_nombre || null,
+        tratante_id: data.tratante_id || undefined,
+        tratante_nombre: data.tratante_nombre || undefined,
+        tratante_funcion: data.tratante_funcion || undefined,
+        fechaIngreso: data.fechaIngreso || "",
       }
     }
 
