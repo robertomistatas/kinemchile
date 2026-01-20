@@ -76,6 +76,12 @@ export default function PacienteDetallePage() {
   const [deletingSesionId, setDeletingSesionId] = useState<string | null>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
+  // Estados para editar notas de evaluaciones (pestaña Evaluaciones)
+  const [showEditarEvaluacionDialog, setShowEditarEvaluacionDialog] = useState(false)
+  const [evaluacionEditando, setEvaluacionEditando] = useState<Sesion | null>(null)
+  const [evaluacionNotasEditando, setEvaluacionNotasEditando] = useState("")
+  const [savingEvaluacionNota, setSavingEvaluacionNota] = useState(false)
+
   // Función para obtener información de la última sesión
   const getUltimaVisitaInfo = () => {
     if (sesiones.length === 0) return null
@@ -290,6 +296,46 @@ export default function PacienteDetallePage() {
   const cancelarEliminarSesion = () => {
     setDeletingSesionId(null)
     setShowDeleteDialog(false)
+  }
+
+  // Edición de notas de evaluaciones (solo pestaña Evaluaciones)
+  const handleEditarEvaluacionNota = (evaluacion: Sesion) => {
+    setEvaluacionEditando(evaluacion)
+    setEvaluacionNotasEditando(evaluacion.notas || "")
+    setShowEditarEvaluacionDialog(true)
+  }
+
+  const handleCancelarEditarEvaluacionNota = () => {
+    setShowEditarEvaluacionDialog(false)
+    setEvaluacionEditando(null)
+    setEvaluacionNotasEditando("")
+  }
+
+  const handleGuardarEvaluacionNota = async () => {
+    if (!evaluacionEditando?.id) return
+
+    try {
+      setSavingEvaluacionNota(true)
+
+      const { actualizarSesion } = await import("@/lib/firestore-service")
+      await actualizarSesion(evaluacionEditando.id, {
+        notas: evaluacionNotasEditando,
+      } as any)
+
+      setEvaluaciones((prev) =>
+        prev.map((e) => (e.id === evaluacionEditando.id ? ({ ...e, notas: evaluacionNotasEditando } as Sesion) : e))
+      )
+
+      setSuccess("Notas de evaluación actualizadas correctamente")
+      setTimeout(() => setSuccess(""), 3000)
+
+      handleCancelarEditarEvaluacionNota()
+    } catch (error) {
+      console.error("Error al actualizar evaluación:", error)
+      setError("Error al actualizar las notas de la evaluación")
+    } finally {
+      setSavingEvaluacionNota(false)
+    }
   }
 
   // Funciones de ordenamiento
@@ -1348,6 +1394,7 @@ export default function PacienteDetallePage() {
                       <TableHead>Fecha</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Notas</TableHead>
+                      <TableHead className="w-24">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1362,6 +1409,28 @@ export default function PacienteDetallePage() {
                         </TableCell>
                         <TableCell>{evaluacion.tipo}</TableCell>
                         <TableCell>{evaluacion.notas}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 no-print">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditarEvaluacionNota(evaluacion)}
+                              title="Editar notas"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeleteSesion(evaluacion.id!)}
+                              className="bg-red-50 hover:bg-red-100 border-red-300 text-red-600"
+                              title="Eliminar evaluación"
+                              disabled={!evaluacion.id}
+                            >
+                              <Trash className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1600,6 +1669,46 @@ export default function PacienteDetallePage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Diálogo para editar notas de evaluación (pestaña Evaluaciones) */}
+      <Dialog
+        open={showEditarEvaluacionDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCancelarEditarEvaluacionNota()
+            return
+          }
+          setShowEditarEvaluacionDialog(true)
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Editar notas de evaluación</DialogTitle>
+            <DialogDescription>Modifica las notas de esta evaluación externa.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="evaluacion-notas">Notas</Label>
+              <Textarea
+                id="evaluacion-notas"
+                value={evaluacionNotasEditando}
+                onChange={(e) => setEvaluacionNotasEditando(e.target.value)}
+                placeholder="Escribe las notas de la evaluación..."
+                rows={10}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelarEditarEvaluacionNota} disabled={savingEvaluacionNota}>
+              Cancelar
+            </Button>
+            <Button onClick={handleGuardarEvaluacionNota} disabled={savingEvaluacionNota}>
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Diálogo de confirmación para eliminar sesión */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
